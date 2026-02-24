@@ -45,6 +45,8 @@ The bucket is organized by prefix, one per backup job:
 | `restic-host/` | Host configuration (restic) |
 | `pg-dump/` | PostgreSQL dump files |
 
+![OCI Object Storage bucket showing prefix breakdown and total usage against the 20 GB free tier](/k8s-portfolio/images/oci-bucket.png)
+
 OCI access is configured through an API key pair. Credentials are stored as environment variables in the respective systemd service unit files and as a Kubernetes Secret for Velero's `BackupStorageLocation`.
 
 ---
@@ -258,7 +260,7 @@ The `oci_bucket_limit_bytes` metric represents the 20 GB OCI free tier ceiling. 
 
 Every backup layer feeds metrics into **Prometheus Pushgateway**, making the full backup posture visible in Grafana. The custom **"Homelab Backup & Storage"** dashboard provides an at-a-glance view of backup health across all jobs.
 
-{/* IMAGE: Custom Grafana "Homelab Backup & Storage" dashboard showing all panels */}
+![Custom Grafana "Homelab Backup & Storage" dashboard — all backup layers showing green status](/k8s-portfolio/images/grafana-backup-dashboard.png)
 
 ### Dashboard Panels
 
@@ -351,6 +353,8 @@ velero restore create --from-backup <backup-name> \
 velero restore describe <restore-name>
 ```
 
+![velero backup get output showing recent successful backups across all scheduled namespaces](/k8s-portfolio/images/velero-backup-cli.png)
+
 ### Restore Raw PVC Data (restic)
 
 ```bash
@@ -392,10 +396,3 @@ All jobs run daily. RPO is therefore bounded at approximately 24 hours across al
 
 ---
 
-## 📸 Images Needed
-
-- Custom "Homelab Backup & Storage" Grafana dashboard (full screenshot showing all stat panels green)
-- Grafana stat panels showing backup status OK for all jobs
-- OCI Object Storage bucket page showing prefix breakdown and total usage
-- `velero backup get` output showing recent successful backups
-- AlertManager showing a fired BackupFailed or BackupStale alert (for illustration)

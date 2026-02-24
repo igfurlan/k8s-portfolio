@@ -87,7 +87,7 @@ The stack runs entirely in the `monitoring` namespace and is composed of well-es
   </Card>
 </CardGrid>
 
-{/* IMAGE: Prometheus targets page showing all scrape targets as UP */}
+![Prometheus targets page showing all scrape targets as UP](/k8s-portfolio/images/prometheus-targets.png)
 
 ### ServiceMonitor CRDs
 
@@ -157,7 +157,9 @@ Alloy runs as a **DaemonSet** ensuring it's present on every node. The `loki-can
 {pod="n8n-c955cdc45-cxr6b"}
 ```
 
-{/* IMAGE: Grafana Explore view showing Loki log stream for a namespace */}
+![Grafana Explore — Loki log stream showing Kubernetes HTTP errors by namespace](/k8s-portfolio/images/loki-kubernetes-http-errors.png)
+
+![Grafana Explore — Loki log stream showing systemd journal errors from host services](/k8s-portfolio/images/loki-journald-errors.png)
 
 ## Grafana
 
@@ -177,7 +179,7 @@ A fully custom dashboard tracks the backup and storage posture of the cluster. I
 
 [Full dashboard documentation and panel breakdown →](/k8s-portfolio/backup/strategy/)
 
-{/* IMAGE: Custom Grafana "Homelab Backup & Storage" dashboard */}
+![Custom Grafana "Homelab Backup & Storage" dashboard showing backup status across all layers](/k8s-portfolio/images/grafana-backup-dashboard.png)
 
 ### Pre-built Dashboards (from kube-prometheus-stack)
 
@@ -190,7 +192,7 @@ A fully custom dashboard tracks the backup and storage posture of the cluster. I
 | CoreDNS | DNS query rates and errors |
 | Grafana Overview | Grafana self-health |
 
-{/* IMAGE: Grafana dashboard showing Kubernetes cluster resource usage */}
+![Grafana Kubernetes cluster resource usage dashboard — CPU, memory, and workload metrics](/k8s-portfolio/images/grafana-kubernetes-resources-dashboard.png)
 
 ## Alerting — AlertManager
 
@@ -223,7 +225,9 @@ A custom `PrometheusRule` resource defines homelab-specific alerts:
 
 Critical alerts are sent immediately to both a Telegram bot (`musashi_homelab_bot`) and a Gmail address. The dual-channel approach ensures notifications are received even if one channel is unavailable.
 
-{/* IMAGE: Example Telegram alert notification from AlertManager showing a critical alert */}
+![AlertManager notification via Telegram bot — critical alert example](/k8s-portfolio/images/alerts-telegram.png)
+
+![Prometheus alerts page showing active alert rules and their states](/k8s-portfolio/images/prometheus-alerts.png)
 
 ## Observability Integration with Argo Rollouts
 
@@ -286,11 +290,3 @@ All PVCs are stored under `/opt/local-path-provisioner/` on the host SSD and are
 | Blackbox Exporter | ~20 MB |
 | **Total** | **~1.1–1.6 GB** |
 
-## 📸 Images Needed
-
-- Prometheus targets page showing all active scrape targets as UP
-- Grafana Explore view showing a Loki log stream (e.g., `{namespace="backstage"}`)
-- Custom "Homelab Backup & Storage" Grafana dashboard
-- Grafana Kubernetes cluster resource usage dashboard
-- Telegram app showing an example AlertManager notification (redact any sensitive info)
-- Argo Rollouts dashboard showing active AnalysisRun during canary deployment

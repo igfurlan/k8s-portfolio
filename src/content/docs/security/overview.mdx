@@ -73,7 +73,7 @@ The `backstage-db` SealedSecret contains all database connection credentials for
 
 Sealed Secrets is the pragmatic choice for a homelab: zero external dependencies, zero ongoing cost, and complete GitOps compatibility.
 
-{/* IMAGE: Screenshot of SealedSecret resource in ArgoCD showing it's healthy and synced */}
+![SealedSecret resource — backstage-db encrypted secret as seen in the cluster](/k8s-portfolio/images/sealed-secrets.png)
 
 The sealed-secrets-controller runs in `kube-system`:
 
@@ -113,7 +113,9 @@ Every image pushed to Harbor is automatically scanned by **Trivy**, which checks
 
 Scan results are visible in the Harbor UI per image, per tag. Policies can be configured to block image pulls if critical vulnerabilities are detected.
 
-{/* IMAGE: Harbor UI showing image repository with Trivy scan results (vulnerability count badges) */}
+![Harbor UI showing image repository with Trivy vulnerability scan badges per tag](/k8s-portfolio/images/harbor-ui.png)
+
+![Harbor Trivy scan detail — CVE list and severity breakdown for a scanned image tag](/k8s-portfolio/images/harbor-trivy-vulnerabilities.png)
 
 ## TLS Certificate Management — cert-manager
 
@@ -153,7 +155,7 @@ Used for internal services and as a bootstrap issuer for cert-manager's own webh
 
 Certificates are automatically renewed by cert-manager before expiry. The renewal process requires no manual intervention.
 
-{/* IMAGE: Screenshot of `kubectl get certificates --all-namespaces` showing all certificates as READY=True */}
+![kubectl get certificates --all-namespaces showing all certificates as READY=True](/k8s-portfolio/images/certmanager-certificates.png)
 
 ## Network Security — Cilium
 
@@ -263,6 +265,8 @@ ETCDCTL_API=3 etcdctl \
 # A plaintext secret starts with: {"kind":"Secret"...
 ```
 
+![etcdctl output confirming secrets are stored with the k8s:enc:aescbc:v1: prefix — encryption at rest verified](/k8s-portfolio/images/kubernetes-etcd-encryption.png)
+
 ### Why This Is Important
 
 | Scenario | Without encryption | With encryption |
@@ -317,10 +321,3 @@ Since this is a single-node homelab with a single administrator, RBAC complexity
 | API activity visibility | kube-apiserver audit logging → Loki |
 | Secrets at rest | etcd encryption at rest (AES-CBC) |
 
-## 📸 Images Needed
-
-- ArgoCD or `kubectl get sealedsecret -n backstage` showing the backstage-db SealedSecret
-- Harbor UI showing image repository with Trivy scan results and vulnerability counts
-- `kubectl get certificates --all-namespaces` showing all certificates as READY=True
-- Grafana/Loki showing audit log entries (e.g., a `kubectl exec` or Secret access event)
-- `etcdctl get /registry/secrets/...` output showing the `k8s:enc:aescbc:v1:` prefix (confirming encryption)

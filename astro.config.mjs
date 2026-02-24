@@ -8,6 +8,23 @@ export default defineConfig({
 	base: '/k8s-portfolio',
 	integrations: [
 		starlight({
+			head: [
+				{
+					tag: 'script',
+					content: `
+						function initImageZoom() {
+							document.querySelectorAll('.sl-markdown-content img').forEach(img => {
+								if (!img.dataset.zoomInit) {
+									img.dataset.zoomInit = '1';
+									img.addEventListener('click', () => window.open(img.src, '_blank'));
+								}
+							});
+						}
+						document.addEventListener('DOMContentLoaded', initImageZoom);
+						document.addEventListener('astro:page-load', initImageZoom);
+					`,
+				},
+			],
 			title: 'Kubernetes Homelab',
 			description: 'A production-grade Kubernetes homelab running on a single node — showcasing GitOps, observability, security, and cloud-native patterns.',
 			social: [

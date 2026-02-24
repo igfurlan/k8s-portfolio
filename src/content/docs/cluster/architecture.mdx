@@ -11,7 +11,7 @@ import { Badge, Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
 This homelab runs a single-node, production-grade Kubernetes cluster on bare metal. The goal is to mirror real-world platform engineering practices — GitOps, observability, automated deployments, and secure secret management — in a resource-constrained environment.
 
-{/* IMAGE: Full-screen photo of the mini PC running the cluster (musashi node) */}
+![musashi node — the single bare-metal machine running the entire cluster](/k8s-portfolio/images/cluster-nodes.png)
 
 ## Hardware
 
@@ -80,7 +80,7 @@ spec:
 
 External access to cluster services uses a **Cloudflare Tunnel** (`cloudflared`) running as a systemd user service on the host. The tunnel terminates TLS at Cloudflare's edge and forwards traffic to Traefik's ClusterIP. This avoids opening inbound ports on the home router.
 
-{/* IMAGE: Screenshot of Traefik dashboard showing active routes and services */}
+![Traefik dashboard showing active routes and services](/k8s-portfolio/images/traefik-dashboard.png)
 
 ## Storage — local-path Provisioner
 
@@ -118,7 +118,7 @@ Active certificates:
 | `traefik-gateway-cert` | traefik | Ready |
 | `traefik-letsencrypt-cert` | traefik | Ready |
 
-{/* IMAGE: Screenshot of cert-manager certificates in ArgoCD or kubectl output */}
+![cert-manager certificates showing all entries as Ready](/k8s-portfolio/images/certmanager-certificates.png)
 
 ## Conceptual Architecture Diagram
 
@@ -221,9 +221,3 @@ Grouped by function:
 | `n8n` | n8n | Workflow automation |
 | `miniflux` | miniflux | RSS feed reader |
 
-## 📸 Images Needed
-
-- Photo of the mini PC hardware running the homelab (musashi node)
-- Screenshot of Traefik dashboard showing active routes and services
-- Screenshot of cert-manager certificates list (kubectl output or ArgoCD)
-- Screenshot of `kubectl get nodes -o wide` showing musashi node status
