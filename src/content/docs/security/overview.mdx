@@ -1,0 +1,248 @@
+---
+title: Cluster Security
+description: How secrets, certificates, container images, and backups are secured on the musashi Kubernetes homelab cluster.
+sidebar:
+  order: 1
+---
+
+import { Badge, Card, CardGrid, Aside, Steps } from '@astrojs/starlight/components';
+
+# Cluster Security
+
+Security in a homelab environment can feel optional — but treating it as a first-class concern means the skills and patterns developed here transfer directly to production. This cluster implements defense-in-depth across secrets management, TLS certificate automation, container image scanning, network encryption, and disaster recovery.
+
+## Sealed Secrets — Encrypted Secrets in Git
+
+One of the core principles of GitOps is that everything is in Git. But Kubernetes `Secret` objects are only base64-encoded — not encrypted. Committing them to a repository is a serious security risk.
+
+**Sealed Secrets** (by Bitnami) solves this with asymmetric encryption. A controller running inside the cluster holds a private key. The corresponding public key is used to encrypt secrets locally, producing a `SealedSecret` resource that can be safely committed to Git.
+
+### How It Works
+
+```
+Developer machine              Kubernetes cluster
+      │                               │
+      │  1. Create plain Secret       │
+      │     (never committed)         │
+      │                               │
+      │  2. kubeseal --format yaml    │
+      │     (fetches public key)      │
+      │          │                    │
+      │          ▼                    │
+      │  SealedSecret YAML ──────────►│ sealed-secrets-controller
+      │  (safe to commit)             │ decrypts with private key
+      │                               │     │
+      │  3. git commit sealed-secret  │     ▼
+      │     to backstage-gitops       │ plain Secret created
+      │                               │ in cluster
+```
+
+The sealed data looks like this in the GitOps repository:
+
+```yaml
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: backstage-db
+  namespace: backstage
+spec:
+  encryptedData:
+    POSTGRES_HOST: AgBziRak...  # ciphertext — safe in Git
+    POSTGRES_USER: AgAPDgp5...
+    POSTGRES_PASSWORD: AgBnsz...
+    POSTGRES_PORT: AgAdxhid...
+    BACKEND_SECRET: AgA83TQg...
+  template:
+    metadata:
+      name: backstage-db
+      namespace: backstage
+    type: Opaque
+```
+
+The `backstage-db` SealedSecret contains all database connection credentials for the Backstage application. These values are decrypted automatically by the `sealed-secrets-controller` (running in `kube-system`) every time ArgoCD syncs.
+
+### Why This Is Better Than Alternatives
+
+| Approach | In Git | Encrypted | Cluster-managed |
+|---|---|---|---|
+| Plain Secret | ❌ (never) | ❌ | ✓ |
+| ConfigMap with secrets | ❌ (dangerous) | ❌ | ✓ |
+| Vault + Vault Agent | ✓ (references) | ✓ | ✓ |
+| **Sealed Secrets** | ✓ (ciphertext) | ✓ | ✓ |
+| External Secrets + AWS SM | ✓ (references) | ✓ | ✓ |
+
+Sealed Secrets is the pragmatic choice for a homelab: zero external dependencies, zero ongoing cost, and complete GitOps compatibility.
+
+{/* IMAGE: Screenshot of SealedSecret resource in ArgoCD showing it's healthy and synced */}
+
+The sealed-secrets-controller runs in `kube-system`:
+
+```
+kube-system   sealed-secrets-controller-869f4b696b   1/1 Running   27h
+```
+
+<Aside type="caution">
+The sealed-secrets-controller's private key is the crown jewel. It's automatically backed up as part of the Velero cluster backup. Without it, sealed secrets in Git cannot be decrypted and credentials would need to be regenerated.
+</Aside>
+
+## Harbor — Private Container Registry
+
+**Harbor** is the private container registry running in the `harbor` namespace. All custom container images built in CI are pushed to **GHCR** (GitHub Container Registry), but Harbor serves as the internal registry for any air-gapped image mirroring and provides the full image lifecycle management features that GHCR does not.
+
+### Harbor Components
+
+| Pod | Role |
+|---|---|
+| `harbor-core` | Core API and registry logic |
+| `harbor-registry` | OCI-compliant image storage (2 containers: registry + registryctl) |
+| `harbor-nginx` | Reverse proxy and TLS termination |
+| `harbor-portal` | Web UI |
+| `harbor-jobservice` | Async jobs: replication, garbage collection |
+| `harbor-database` | PostgreSQL (StatefulSet) |
+| `harbor-redis` | Session cache and job queue |
+| `harbor-trivy` | Vulnerability scanner |
+
+Harbor is accessed at `harbor.kubefurlan.com` (via Traefik HTTPRoute) and uses a **cert-manager-issued TLS certificate** (`harbor-tls`).
+
+### Trivy Vulnerability Scanning
+
+Every image pushed to Harbor is automatically scanned by **Trivy**, which checks for:
+- Known CVEs in OS packages (Alpine, Debian, Ubuntu, etc.)
+- Application dependency vulnerabilities (npm, pip, Maven, Go modules)
+- Configuration issues (misconfigurations, secret leaks)
+
+Scan results are visible in the Harbor UI per image, per tag. Policies can be configured to block image pulls if critical vulnerabilities are detected.
+
+{/* IMAGE: Harbor UI showing image repository with Trivy scan results (vulnerability count badges) */}
+
+## TLS Certificate Management — cert-manager
+
+All HTTPS traffic in the cluster is terminated with certificates managed by **cert-manager**. Two `ClusterIssuer` resources cover different use cases:
+
+### letsencrypt-prod (Production TLS)
+
+Uses the **ACME DNS-01 challenge** via the Cloudflare API to issue certificates for `*.kubefurlan.com` and `kubefurlan.com`. DNS-01 is required because the cluster is not publicly reachable over HTTP (port 80 is not forwarded on the home router) — but Cloudflare DNS validation works purely over the Cloudflare API.
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+```
+
+### selfsigned-issuer (Internal TLS)
+
+Used for internal services and as a bootstrap issuer for cert-manager's own webhook certificate. Self-signed certificates are suitable for cluster-internal communication where the CA is explicitly trusted.
+
+### Active Certificates
+
+| Certificate | Namespace | Issuer | Status |
+|---|---|---|---|
+| `harbor-tls` | harbor | letsencrypt-prod | Ready |
+| `traefik-gateway-cert` | traefik | selfsigned-issuer | Ready |
+| `traefik-letsencrypt-cert` | traefik | letsencrypt-prod | Ready |
+
+Certificates are automatically renewed by cert-manager before expiry. The renewal process requires no manual intervention.
+
+{/* IMAGE: Screenshot of `kubectl get certificates --all-namespaces` showing all certificates as READY=True */}
+
+## Network Security — Cilium
+
+The **Cilium** CNI is more than just a pod networking plugin. Its eBPF-based dataplane provides:
+
+### eBPF-Based kube-proxy Replacement
+
+Cilium completely replaces `kube-proxy` for service load balancing. Service routing is implemented in eBPF programs attached to the kernel's network stack, bypassing the overhead of iptables rules.
+
+### Network Policy Enforcement
+
+Cilium enforces standard Kubernetes `NetworkPolicy` resources and extends them with `CiliumNetworkPolicy` for L7-aware policies. Network policies can restrict:
+- Which pods can communicate with which other pods
+- Which namespaces can communicate
+- Which external IPs are reachable from the cluster
+
+### Hubble Observability
+
+Cilium's built-in **Hubble** provides network flow visibility — showing which pods are communicating, on which ports, and whether traffic was allowed or dropped by network policy. This is invaluable for debugging connectivity issues and auditing network access patterns.
+
+{/* IMAGE: Cilium/Hubble network flow visualization (if Hubble UI is accessible) */}
+
+## Backup and Disaster Recovery — Velero + Restic + OCI
+
+Security includes the ability to recover from failures. The backup strategy is multi-layered:
+
+### Layer 1 — Kubernetes Resources (Velero)
+
+**Velero** with the **Kopia** backup driver backs up Kubernetes resource definitions and PersistentVolume data. Scheduled backup jobs run for each critical namespace:
+
+```
+velero   cnpg-system-default-kopia-maintain-job   Completed
+velero   harbor-default-kopia-maintain-job         Completed
+velero   n8n-default-kopia-maintain-job            Completed
+velero   postgres-default-kopia-maintain-job       Completed
+velero   velero-default-kopia-maintain-job         Completed
+```
+
+Velero's `node-agent` DaemonSet handles the actual volume data copying.
+
+### Layer 2 — PersistentVolume Data (restic)
+
+The raw PVC data in `/opt/local-path-provisioner/` is backed up daily by **restic** to OCI Object Storage (Oracle Cloud Infrastructure, São Paulo region) — which provides 20 GB of free tier storage.
+
+Backup metrics (success/failure, duration, files changed) are pushed to **Prometheus Pushgateway** after each run, making backup health visible in Grafana and alertable via AlertManager.
+
+### Layer 3 — PostgreSQL Logical Backup (pg_dump)
+
+A daily `pg_dumpall` job creates a logical dump of all PostgreSQL databases. The dump size is tracked as a metric in Prometheus and the dump file is included in the restic host backup.
+
+### Layer 4 — Host Configuration (restic)
+
+The host filesystem configuration (`/home/ifurlan`, `/etc`) is backed up separately using a second restic repository (`restic-host`).
+
+### Alert Coverage
+
+| Alert | Trigger |
+|---|---|
+| `BackupFailed` | Any backup job reports `backup_success == 0` |
+| `BackupStale` | More than 48 hours since last successful backup |
+
+{/* IMAGE: Grafana "Homelab Backup & Storage" dashboard showing backup success status for all jobs */}
+
+## RBAC and Access Control
+
+Since this is a single-node homelab with a single administrator, RBAC complexity is minimal but the standard Kubernetes RBAC model is fully enforced:
+
+- **Sealed Secrets controller** runs with its own ServiceAccount scoped to reading/writing Secrets
+- **ArgoCD** uses the Kubernetes RBAC system, with its application controller having cluster-admin rights (scoped to the `default` project)
+- **Velero** runs with cluster-admin to be able to backup/restore any resource
+- **cert-manager** uses scoped RBAC to manage its own CRDs and create Secrets for certificates
+
+## Security Surface Summary
+
+| Concern | Mitigation |
+|---|---|
+| Secrets in Git | Sealed Secrets (asymmetric encryption) |
+| Unscanned images | Harbor + Trivy vulnerability scanning |
+| Expired TLS certs | cert-manager with auto-renewal |
+| Data loss | Velero + restic + OCI Object Storage |
+| Network isolation | Cilium NetworkPolicy (eBPF) |
+| Backup failures | Prometheus alerts → Telegram + Gmail |
+| Unauthorized cluster access | kubeconfig on local machine only, no public API server |
+
+## 📸 Images Needed
+
+- ArgoCD or `kubectl get sealedsecret -n backstage` showing the backstage-db SealedSecret
+- Harbor UI showing image repository with Trivy scan results and vulnerability counts
+- `kubectl get certificates --all-namespaces` showing all certificates as READY=True
+- Grafana backup dashboard showing all backup jobs as OK/green
+- Cilium/Hubble network flow visualization (optional — requires Hubble UI to be enabled)
+- Velero backup schedule list (`velero backup-location get` or Velero UI if available)

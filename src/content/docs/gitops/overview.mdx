@@ -1,0 +1,269 @@
+---
+title: GitOps with ArgoCD & Argo Rollouts
+description: How GitOps is implemented using ArgoCD, GitHub Actions CI, Argo Rollouts canary deployments, and Sealed Secrets on the musashi homelab cluster.
+sidebar:
+  order: 1
+---
+
+import { Badge, Card, CardGrid, Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# GitOps with ArgoCD & Argo Rollouts
+
+GitOps is the operational model where Git is the single source of truth for both application and infrastructure state. Every change to a running system is made through a Git commit — never by running `kubectl apply` directly against the cluster. The cluster continuously reconciles its actual state against the desired state declared in Git.
+
+This setup implements GitOps for the **Backstage** Internal Developer Portal, using a two-repository pattern, ArgoCD for continuous deployment, GitHub Actions for CI, and Argo Rollouts for safe progressive delivery.
+
+## The Two-Repository Pattern
+
+The GitOps workflow is split across two GitHub repositories:
+
+| Repository | Purpose |
+|---|---|
+| [`igfurlan/backstage`](https://github.com/igfurlan/backstage) | Application source code, Dockerfile, GitHub Actions workflows |
+| [`igfurlan/backstage-gitops`](https://github.com/igfurlan/backstage-gitops) | Kubernetes manifests, Kustomize overlays, Argo Rollout definition |
+
+This separation is intentional: it decouples the application lifecycle (builds, tests) from the deployment lifecycle (manifest changes, environment promotions). ArgoCD only watches the GitOps repo — it never has access to the application source code.
+
+{/* IMAGE: Diagram of the two-repository GitOps flow (app repo → CI → gitops repo → ArgoCD → cluster) */}
+
+## GitOps Repository Structure
+
+The `backstage-gitops` repository uses a **Kustomize overlay** pattern:
+
+```
+backstage-gitops/
+├── base/
+│   ├── kustomization.yaml      # Assembles all base resources
+│   ├── namespace.yaml          # backstage namespace
+│   ├── rollout.yaml            # Argo Rollout (replaces Deployment)
+│   ├── service.yaml            # ClusterIP service
+│   ├── httproute.yaml          # Gateway API HTTPRoute
+│   ├── analysis-template.yaml  # Prometheus-based canary analysis
+│   └── sealed-secret.yaml      # Encrypted DB credentials
+└── overlays/
+    └── production/
+        ├── kustomization.yaml  # Extends base
+        └── patches/
+            └── resources.yaml  # Image tag + resource limits patch
+```
+
+The `base/` layer defines the universal configuration. The `production/` overlay applies environment-specific patches — most importantly, the container **image tag**, which is updated automatically by the CI pipeline on every successful push to `main`.
+
+## ArgoCD Application
+
+ArgoCD monitors the `overlays/production` path in the GitOps repository:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: backstage
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/igfurlan/backstage-gitops.git
+    targetRevision: main
+    path: overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: backstage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
+
+Key policies:
+- **`automated`** — ArgoCD syncs automatically when the GitOps repo changes; no manual approval needed
+- **`prune: true`** — resources removed from Git are also removed from the cluster
+- **`selfHeal: true`** — if someone manually changes a resource in the cluster, ArgoCD reverts it to match Git within seconds
+
+{/* IMAGE: ArgoCD UI showing the backstage application in Synced/Healthy state with resource tree */}
+
+## GitHub Actions CI Pipeline
+
+The CI pipeline in `backstage/.github/workflows/ci.yaml` runs two jobs depending on the event type:
+
+<Tabs>
+  <TabItem label="On Pull Request">
+    **Job: `validate`**
+
+    Triggered when a PR is opened against `main`. Builds the Docker image using BuildKit cache but does **not** push it. This validates that the Dockerfile is correct and the build succeeds without spending registry storage.
+
+    Steps:
+    1. Checkout code
+    2. Set up Docker Buildx
+    3. Log in to GitHub Container Registry (GHCR)
+    4. Build image (no push) — uses GitHub Actions cache (`type=gha`)
+  </TabItem>
+  <TabItem label="On Push to main">
+    **Job: `deploy`**
+
+    Triggered when a commit is merged to `main`. This is the full deployment pipeline.
+
+    Steps:
+    1. Checkout application code
+    2. Set up Docker Buildx
+    3. Log in to GHCR
+    4. Extract short Git SHA (`git rev-parse --short HEAD`)
+    5. Build and push image with two tags:
+       - `ghcr.io/igfurlan/backstage:sha-<shortsha>` (immutable, for rollback)
+       - `ghcr.io/igfurlan/backstage:latest` (floating, for local dev)
+    6. Checkout `backstage-gitops` repo (using a `GITOPS_PAT` secret)
+    7. Patch the image tag in `overlays/production/patches/resources.yaml`
+    8. Commit and push: `"deploy: backstage sha-<shortsha>"`
+  </TabItem>
+</Tabs>
+
+The pipeline uses GitHub Actions cache (`type=gha`) for Docker layer caching. Build times drop significantly after the first run because unchanged layers are reused from the cache.
+
+```yaml
+# Image tag update step (from ci.yaml)
+- name: Update image tag
+  run: |
+    cd gitops
+    sed -i "s|value: ghcr.io/igfurlan/backstage:sha-.*|\
+    value: ghcr.io/igfurlan/backstage:sha-${{ steps.sha.outputs.short }}|" \
+    overlays/production/patches/resources.yaml
+    git add .
+    git diff --staged --quiet || \
+    git commit -m "deploy: backstage sha-${{ steps.sha.outputs.short }}"
+    git push
+```
+
+{/* IMAGE: GitHub Actions CI run showing all steps passing — build, push, gitops update */}
+
+## Argo Rollouts — Canary Deployment Strategy
+
+Instead of a standard Kubernetes `Deployment`, Backstage uses an **Argo Rollout** resource. This enables **canary deployments** — gradually shifting traffic to the new version while monitoring error rates and latency in real time.
+
+The canary strategy is defined in `base/rollout.yaml`:
+
+```yaml
+strategy:
+  canary:
+    analysis:
+      templates:
+        - templateName: backstage-canary-check
+      startingStep: 1
+    steps:
+      - setWeight: 20     # 20% of traffic to new version
+      - pause: { duration: 60s }
+      - setWeight: 50     # 50% of traffic
+      - pause: { duration: 60s }
+      - setWeight: 80     # 80% of traffic
+      - pause: { duration: 30s }
+      # Full 100% promotion happens automatically if analysis passes
+```
+
+The rollout progresses through 3 traffic weight stages, pausing at each to observe metrics. At step 1, an **AnalysisRun** begins and runs continuously throughout the rollout.
+
+{/* IMAGE: Argo Rollouts dashboard showing an active canary deployment with traffic weight visualization */}
+
+### Canary Analysis — Prometheus Metrics Gates
+
+The `AnalysisTemplate` (`backstage-canary-check`) queries **Prometheus** at 30-second intervals throughout the canary rollout. Three metrics are evaluated:
+
+<CardGrid>
+  <Card title="Error Rate" icon="warning">
+    **Metric:** HTTP 5xx error rate on Traefik service requests
+    **Query:** `sum(rate(traefik_service_requests_total{...code=~"5.."}[2m])) / sum(rate(...))`
+    **Threshold:** ≤ 25% error rate (`result[0] <= 0.25`)
+    **Failure limit:** 3 consecutive failures before rollback
+  </Card>
+  <Card title="p95 Latency" icon="rocket">
+    **Metric:** 95th percentile request duration via Traefik histogram
+    **Query:** `histogram_quantile(0.95, sum(rate(traefik_service_request_duration_seconds_bucket{...}[2m])) by (le))`
+    **Threshold:** ≤ 5 seconds
+    **Failure limit:** 3 consecutive failures before rollback
+  </Card>
+  <Card title="Pod Restarts" icon="seti:shell">
+    **Metric:** Container restart count increase in the backstage namespace
+    **Query:** `sum(increase(kube_pod_container_status_restarts_total{namespace="backstage",...}[2m]))`
+    **Threshold:** < 2 restarts
+    **Failure limit:** 2 consecutive failures before rollback
+  </Card>
+</CardGrid>
+
+If any metric exceeds its threshold too many times, the AnalysisRun fails and Argo Rollouts **automatically rolls back** to the previous stable version — without any human intervention.
+
+```yaml
+# From analysis-template.yaml
+metrics:
+  - name: error-rate
+    interval: 30s
+    successCondition: len(result) == 0 || isNaN(result[0]) || result[0] <= 0.25
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(traefik_service_requests_total{exported_service=~"backstage-backstage-.*",code=~"5.."}[2m]))
+          /
+          sum(rate(traefik_service_requests_total{exported_service=~"backstage-backstage-.*"}[2m]))
+```
+
+This integration closes the loop between the **observability stack** (Prometheus + Traefik metrics) and the **deployment pipeline**, creating a true automated feedback loop.
+
+## Sealed Secrets in the GitOps Flow
+
+Storing Kubernetes secrets in Git is normally a security anti-pattern — secrets would be visible to anyone with repository access. **Sealed Secrets** (by Bitnami) solves this by allowing secrets to be encrypted before being committed to Git.
+
+The backstage database credentials (`POSTGRES_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`, `BACKEND_SECRET`) are stored as a `SealedSecret` resource in `base/sealed-secret.yaml`.
+
+The workflow:
+1. Create a plain Kubernetes `Secret` locally (never committed)
+2. Encrypt it with `kubeseal`, using the cluster's public key: `kubeseal --format yaml < secret.yaml > sealed-secret.yaml`
+3. Commit the `SealedSecret` YAML to Git (safe — it's ciphertext)
+4. When ArgoCD applies it, the `sealed-secrets-controller` decrypts it and creates the real `Secret` in the cluster
+
+The sealed data can only be decrypted by the cluster that holds the corresponding private key. Even if the GitOps repository is public, the encrypted secrets are worthless to an attacker without access to the cluster.
+
+{/* IMAGE: Screenshot of sealed-secrets-controller logs showing successful decryption, or SealedSecret resource in ArgoCD */}
+
+## End-to-End Flow Summary
+
+```
+Developer pushes to main (backstage repo)
+        │
+        ▼
+GitHub Actions CI
+  ├─ Build Docker image
+  ├─ Push to GHCR (ghcr.io/igfurlan/backstage:sha-abc123)
+  ├─ Clone backstage-gitops repo
+  ├─ Update image tag in overlays/production
+  └─ Commit & push "deploy: backstage sha-abc123"
+        │
+        ▼
+ArgoCD detects change in backstage-gitops
+  └─ Applies Kustomize overlay to cluster
+        │
+        ▼
+Argo Rollouts starts canary rollout
+  ├─ Step 1: 20% traffic → new version
+  ├─ AnalysisRun: query Prometheus every 30s
+  │    ├─ error-rate ≤ 0.25 ✓
+  │    ├─ p95 latency ≤ 5s ✓
+  │    └─ pod-restarts < 2 ✓
+  ├─ Step 2: 50% traffic (after 60s)
+  ├─ Step 3: 80% traffic (after 60s)
+  └─ Step 4: 100% promotion (after 30s)
+        │
+        ▼
+New version fully deployed — zero downtime
+```
+
+<Aside type="tip">
+If any Prometheus metric threshold is breached during the canary analysis, Argo Rollouts automatically aborts the rollout and reverts traffic to 100% stable — without any manual intervention.
+</Aside>
+
+## 📸 Images Needed
+
+- Diagram of the two-repository GitOps flow (can be created as a draw.io or Mermaid diagram)
+- ArgoCD UI showing the backstage application tree (Synced / Healthy state with all resources visible)
+- GitHub Actions run showing all CI steps completing successfully
+- Argo Rollouts dashboard showing a live or recent canary rollout with traffic weight bars
+- Screenshot of SealedSecret resource in ArgoCD or `kubectl get sealedsecret -n backstage`

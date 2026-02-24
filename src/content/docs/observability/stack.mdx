@@ -1,0 +1,305 @@
+---
+title: Observability Stack
+description: Full-stack observability on the musashi homelab cluster — Prometheus, Grafana, Loki, Alloy, AlertManager, and Prometheus-gated canary deployments.
+sidebar:
+  order: 1
+---
+
+import { Badge, Card, CardGrid, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Observability Stack
+
+Observability is not an afterthought in this homelab — it's a first-class concern. Every workload is monitored, every log line is indexed, and every alert has a defined routing policy. The stack is designed to answer three questions: **What is the system doing right now? What happened in the past? What should I be notified about?**
+
+The stack runs entirely in the `monitoring` namespace and is composed of well-established open-source projects, deployed via Helm.
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Grafana                                 │
+│                   grafana.kubefurlan.com                        │
+│            (dashboards, explore, alerting)                      │
+├──────────────┬──────────────┬───────────────────────────────────┤
+│   Metrics    │     Logs     │         Probes                    │
+│  Prometheus  │     Loki     │   Blackbox Exporter               │
+├──────────────┴──────────────┴───────────────────────────────────┤
+│                      Collectors                                 │
+│  Grafana Alloy (DaemonSet) ── K8s pod logs + host journal       │
+│  Node Exporter ── host metrics (CPU, mem, disk, systemd)        │
+│  kube-state-metrics ── K8s object metrics                       │
+│  Pushgateway ── batch job metrics (backups, OCI bucket)         │
+├─────────────────────────────────────────────────────────────────┤
+│                      Alerting                                   │
+│  AlertManager ──► Telegram bot + Gmail                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Component Inventory
+
+| Component | Helm Chart | Version | Type | Purpose |
+|---|---|---|---|---|
+| kube-prometheus-stack | `prometheus-community/kube-prometheus-stack` | 81.6.4 | Deployment | Prometheus, Grafana, AlertManager, node-exporter, kube-state-metrics |
+| Loki | `grafana/loki` | — | StatefulSet | Log storage and querying (monolithic mode) |
+| Grafana Alloy | `grafana/alloy` | — | DaemonSet | Log collection (K8s pods + host systemd journal) |
+| Pushgateway | `prometheus-community/prometheus-pushgateway` | — | Deployment | Receives metrics from batch jobs |
+| Blackbox Exporter | `prometheus-community/prometheus-blackbox-exporter` | — | Deployment | HTTP endpoint probing |
+
+## Metrics — Prometheus
+
+**Prometheus** is the time-series metrics database at the heart of the stack. It scrapes metrics from all configured targets on a pull model and stores them with a 5-day retention window in a 10 GiB PVC backed by local-path storage.
+
+### What Prometheus Scrapes
+
+<CardGrid>
+  <Card title="Host Metrics" icon="laptop">
+    **via Node Exporter (DaemonSet)**
+    - CPU usage per core and aggregate
+    - Memory usage and availability
+    - Disk I/O and filesystem usage
+    - Network traffic
+    - System load average
+    - Systemd service states: `AdGuardHome`, `restic-k8s-backup`, `restic-host-backup`, `pg-dump`, `oci-bucket-stats`
+  </Card>
+  <Card title="Kubernetes Metrics" icon="seti:kubernetes">
+    **via kube-state-metrics**
+    - Pod status, restarts, resource requests/limits
+    - Deployment and StatefulSet health
+    - PersistentVolume usage
+    - Node conditions
+    - API server request rates
+  </Card>
+  <Card title="Batch Job Metrics" icon="seti:shell">
+    **via Pushgateway**
+
+    Backup scripts and cron jobs push metrics after completion:
+    - `restic_k8s_data`: success, duration, files_new, files_changed
+    - `restic_host`: success, duration, timestamp
+    - `pg_dump`: success, duration, dump_size_bytes
+    - `oci_bucket` (per prefix): size_bytes, object_count, limit_bytes
+  </Card>
+  <Card title="HTTP Probes" icon="external">
+    **via Blackbox Exporter**
+
+    Synthetic monitoring of external endpoints:
+    - **Jellyfin**: `http://192.168.1.133:8096/health` → HTTP 200
+    - **Cloudflare Tunnel**: `http://192.168.1.133:20241/ready` → HTTP 200
+  </Card>
+</CardGrid>
+
+{/* IMAGE: Prometheus targets page showing all scrape targets as UP */}
+
+### ServiceMonitor CRDs
+
+The Prometheus Operator manages scrape configurations through `ServiceMonitor` resources. The following monitors are active in the `monitoring` namespace:
+
+| ServiceMonitor | Purpose |
+|---|---|
+| `kube-prometheus-stack-alertmanager` | AlertManager metrics |
+| `kube-prometheus-stack-apiserver` | Kubernetes API server |
+| `kube-prometheus-stack-coredns` | CoreDNS query metrics |
+| `kube-prometheus-stack-grafana` | Grafana health |
+| `kube-prometheus-stack-kube-state-metrics` | Kubernetes object state |
+| `kube-prometheus-stack-kubelet` | Kubelet and cAdvisor metrics |
+| `kube-prometheus-stack-operator` | Prometheus Operator itself |
+| `kube-prometheus-stack-prometheus` | Prometheus self-monitoring |
+| `kube-prometheus-stack-prometheus-node-exporter` | Host metrics |
+| `prometheus-pushgateway` | Batch job metrics |
+| `traefik` | Traefik request metrics (used by Argo Rollouts canary analysis) |
+
+<Aside type="note">
+Four kube-prometheus-stack monitors were intentionally disabled: `kubeControllerManager`, `kubeScheduler`, `kubeEtcd`, and `kubeProxy`. On a single-node kubeadm cluster, these components bind to `127.0.0.1`, making them unreachable from the Prometheus pod. Cilium replaces kube-proxy entirely.
+</Aside>
+
+## Logs — Loki + Grafana Alloy
+
+Log aggregation is handled by the **Loki + Alloy** combination. Loki stores logs in a compact, indexed format queryable with LogQL. Alloy is the modern replacement for Promtail — a fully programmable pipeline agent.
+
+### How Logs Flow
+
+```
+K8s pods (all namespaces)          Host systemd journal
+        │                                 │
+        └──────────────┬──────────────────┘
+                       │
+              Grafana Alloy (DaemonSet)
+              (runs on every node)
+              - tails container logs
+              - reads systemd journal
+              - adds labels (namespace, pod, app)
+                       │
+                       ▼
+                    Loki (monolithic mode)
+                    5-day retention / 5 GiB PVC
+                       │
+                       ▼
+              Grafana Explore (LogQL queries)
+```
+
+Alloy runs as a **DaemonSet** ensuring it's present on every node. The `loki-canary` DaemonSet is a companion service that continuously writes test log entries to Loki and verifies they can be read back — providing a live health check of the log ingestion pipeline.
+
+### Useful LogQL Queries
+
+```logql
+# All logs from a namespace
+{namespace="harbor"}
+
+# Host systemd journal logs
+{job="systemd-journal"}
+
+# Filter by systemd unit
+{job="systemd-journal"} |= "AdGuardHome"
+
+# Error-level journal entries
+{job="systemd-journal"} | detected_level="error"
+
+# Logs from a specific pod
+{pod="n8n-c955cdc45-cxr6b"}
+```
+
+{/* IMAGE: Grafana Explore view showing Loki log stream for a namespace */}
+
+## Grafana
+
+Grafana serves as the single pane of glass for all metrics and logs, accessible at `https://grafana.kubefurlan.com` via Cloudflare tunnel.
+
+### Data Sources
+
+| Name | Type | Endpoint |
+|---|---|---|
+| Prometheus | `prometheus` | Auto-configured by kube-prometheus-stack |
+| Loki | `loki` | `http://loki.monitoring.svc.cluster.local:3100` |
+| Alertmanager | `alertmanager` | Auto-configured |
+
+### Custom Dashboard: Homelab Backup & Storage
+
+A fully custom dashboard tracks the backup and storage posture of the cluster:
+
+| Panel | Type | What It Shows |
+|---|---|---|
+| Backup Status | Stat | OK/FAILED per backup job (color-coded) |
+| Time Since Last Backup | Stat | Green < 25h, yellow < 48h, red > 48h |
+| Backup Duration | Bar chart | Historical duration per job |
+| Backup Files (New + Changed) | Stacked bars | File change volume per run |
+| PostgreSQL Dump Size | Line chart | pg_dumpall file size over time |
+| OCI Bucket Usage vs Limit | Gauge | Used vs 20 GB OCI free tier |
+| OCI Bucket Size by Prefix | Pie chart (donut) | Breakdown by backup prefix |
+| OCI Bucket Objects by Prefix | Bar gauge | Object count per prefix |
+
+{/* IMAGE: Custom Grafana dashboard showing backup status panels and OCI bucket usage gauge */}
+
+### Pre-built Dashboards (from kube-prometheus-stack)
+
+| Dashboard | Purpose |
+|---|---|
+| Node Exporter / Nodes | Host CPU, memory, disk, network |
+| Kubernetes / Compute Resources / Cluster | Cluster-wide resource usage |
+| Kubernetes / Compute Resources / Namespace (Pods) | Per-namespace breakdown |
+| Kubernetes / Persistent Volumes | PV usage tracking |
+| CoreDNS | DNS query rates and errors |
+| Grafana Overview | Grafana self-health |
+
+{/* IMAGE: Grafana dashboard showing Kubernetes cluster resource usage */}
+
+## Alerting — AlertManager
+
+**AlertManager** receives fired alerts from Prometheus and routes them to the appropriate notification channels.
+
+### Alert Rules — `homelab-alerts` PrometheusRule
+
+A custom `PrometheusRule` resource defines homelab-specific alerts:
+
+| Alert | Condition | Severity | For |
+|---|---|---|---|
+| `BackupFailed` | `backup_success == 0` | critical | 5m |
+| `BackupStale` | Time since last run > 48h | warning | 5m |
+| `HighMemoryUsage` | Memory > 90% | warning | 5m |
+| `HighCPUUsage` | CPU > 90% | warning | 10m |
+| `HighDiskUsage` | Root filesystem > 90% | critical | 5m |
+| `HostRestarted` | Uptime < 5 minutes | warning | 0m |
+| `JellyfinDown` | HTTP probe fails on :8096 | critical | 3m |
+| `CloudflareTunnelDown` | HTTP probe fails on :20241 | critical | 3m |
+| `OCIBucketNearLimit` | Bucket usage > 85% of 20 GB | warning | 5m |
+
+### Notification Routing
+
+| Route | Receiver | Destination |
+|---|---|---|
+| `severity = critical` | critical | Telegram bot + Gmail |
+| All other alerts | default | Telegram bot + Gmail |
+| Watchdog | null | Silenced |
+| InfoInhibitor | null | Silenced |
+
+Critical alerts are sent immediately to both a Telegram bot (`musashi_homelab_bot`) and a Gmail address. The dual-channel approach ensures notifications are received even if one channel is unavailable.
+
+{/* IMAGE: Example Telegram alert notification from AlertManager showing a critical alert */}
+
+## Observability Integration with Argo Rollouts
+
+The observability stack doesn't just monitor — it actively **gates deployments**. During every canary rollout of Backstage, Argo Rollouts queries Prometheus for real-time application health metrics derived from Traefik's ServiceMonitor:
+
+```
+Canary deployment starts
+        │
+        ▼
+Argo Rollouts creates AnalysisRun
+        │
+        ▼ (every 30s)
+Prometheus queries:
+  ┌──────────────────────────────────────────────┐
+  │ error-rate:                                  │
+  │   traefik_service_requests_total{code="5xx"} │
+  │   ÷ traefik_service_requests_total           │
+  │   → must be ≤ 0.25                           │
+  │                                              │
+  │ p95-latency:                                 │
+  │   histogram_quantile(0.95,                   │
+  │     traefik_service_request_duration_bucket) │
+  │   → must be ≤ 5s                             │
+  │                                              │
+  │ pod-restarts:                                │
+  │   kube_pod_container_status_restarts_total   │
+  │   → must be < 2                              │
+  └──────────────────────────────────────────────┘
+        │
+        ▼
+  Pass: continue canary → 100% promotion
+  Fail: automatic rollback to stable version
+```
+
+This turns Prometheus from a passive observer into an **active safety gate**, automatically protecting production from bad deployments.
+
+## Data Retention and Storage
+
+| Component | Retention | Storage |
+|---|---|---|
+| Prometheus | 5 days | 10 GiB PVC (local-path) |
+| Loki | 5 days (120h) | 5 GiB PVC (local-path) |
+| AlertManager | N/A (config only) | 1 GiB PVC (local-path) |
+| Grafana | N/A (dashboards + config) | 5 GiB PVC (local-path) |
+
+All PVCs are stored under `/opt/local-path-provisioner/` on the host SSD and are included in the daily **restic** backup to OCI Object Storage.
+
+## Estimated Resource Usage
+
+| Component | Memory |
+|---|---|
+| Prometheus | ~400–600 MB |
+| Grafana | ~150–200 MB |
+| Loki | ~256–400 MB |
+| Alloy | ~128–200 MB |
+| AlertManager | ~50 MB |
+| kube-state-metrics | ~50 MB |
+| node-exporter | ~30 MB |
+| Pushgateway | ~20 MB |
+| Blackbox Exporter | ~20 MB |
+| **Total** | **~1.1–1.6 GB** |
+
+## 📸 Images Needed
+
+- Prometheus targets page showing all active scrape targets as UP
+- Grafana Explore view showing a Loki log stream (e.g., `{namespace="backstage"}`)
+- Custom "Homelab Backup & Storage" Grafana dashboard
+- Grafana Kubernetes cluster resource usage dashboard
+- Telegram app showing an example AlertManager notification (redact any sensitive info)
+- Argo Rollouts dashboard showing active AnalysisRun during canary deployment

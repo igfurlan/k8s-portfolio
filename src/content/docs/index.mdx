@@ -1,0 +1,114 @@
+---
+title: Kubernetes Homelab
+description: A production-grade Kubernetes homelab on bare metal — GitOps, canary deployments, full-stack observability, and secure secret management.
+template: splash
+hero:
+  tagline: A production-grade Kubernetes homelab running on bare metal — GitOps, canary deployments, observability, and cloud-native security patterns.
+  image:
+    file: ../../assets/houston.webp
+  actions:
+    - text: Cluster Architecture
+      link: /k8s-portfolio/cluster/architecture/
+      icon: right-arrow
+    - text: GitOps Pipeline
+      link: /k8s-portfolio/gitops/overview/
+      icon: right-arrow
+      variant: minimal
+---
+
+import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
+
+## About This Homelab
+
+Hi, I'm Igor Furlan, a System Reliability Engineer passionate about platform engineering and cloud-native infrastructure.
+
+This site documents a production-grade Kubernetes homelab running on a single bare-metal node — **musashi**, an AMD Ryzen 7 machine running Fedora 43 with 16 GB DDR5 RAM and a 1 TB SSD. The entire stack is built around real-world DevOps patterns: GitOps with ArgoCD, progressive delivery with Argo Rollouts, full-stack observability with Prometheus/Grafana/Loki, and encrypted secret management with Sealed Secrets.
+
+Everything here is the result of hands-on, iterative work. The goal: build infrastructure that teaches production patterns, not shortcuts.
+
+---
+
+## What's Running
+
+<CardGrid stagger>
+  <Card title="🖥️ Cluster Architecture" icon="laptop">
+    Single-node kubeadm cluster (Kubernetes v1.34.3) on Fedora 43. Cilium CNI with eBPF dataplane, Traefik with Gateway API, cert-manager with Let's Encrypt DNS-01, and local-path storage.
+
+    [Read the Architecture →](/k8s-portfolio/cluster/architecture/)
+  </Card>
+  <Card title="🔄 GitOps Pipeline" icon="github">
+    Two-repository GitOps pattern: GitHub Actions CI builds and pushes to GHCR, then ArgoCD syncs Kustomize overlays to the cluster. Argo Rollouts implements Prometheus-gated canary deployments with automatic rollback.
+
+    [Read the GitOps Overview →](/k8s-portfolio/gitops/overview/)
+  </Card>
+  <Card title="📊 Observability Stack" icon="bars">
+    kube-prometheus-stack v81.6.4 (Prometheus + Grafana + AlertManager), Loki for log aggregation, Grafana Alloy as a DaemonSet log collector, Pushgateway for batch job metrics, and Blackbox Exporter for synthetic HTTP probes. Alerts route to Telegram and Gmail.
+
+    [Read the Observability Stack →](/k8s-portfolio/observability/stack/)
+  </Card>
+  <Card title="🔒 Cluster Security" icon="shield">
+    Sealed Secrets for GitOps-compatible encrypted secrets, Harbor with Trivy for private image registry and vulnerability scanning, cert-manager for automated TLS, and Velero + restic for multi-layer backup to OCI Object Storage.
+
+    [Read the Security Overview →](/k8s-portfolio/security/overview/)
+  </Card>
+</CardGrid>
+
+---
+
+## Tech Stack
+
+<br />
+
+**Kubernetes & Runtime**
+
+<span class="tech-badge">Kubernetes v1.34.3</span>
+<span class="tech-badge">kubeadm</span>
+<span class="tech-badge">containerd v2.1.6</span>
+<span class="tech-badge">Fedora Linux 43</span>
+
+**Networking & Ingress**
+
+<span class="tech-badge">Cilium (eBPF)</span>
+<span class="tech-badge">Traefik</span>
+<span class="tech-badge">Gateway API</span>
+<span class="tech-badge">Cloudflare Tunnel</span>
+
+**GitOps & CI/CD**
+
+<span class="tech-badge">ArgoCD</span>
+<span class="tech-badge">Argo Rollouts</span>
+<span class="tech-badge">GitHub Actions</span>
+<span class="tech-badge">Kustomize</span>
+<span class="tech-badge">GHCR</span>
+
+**Observability**
+
+<span class="tech-badge">Prometheus</span>
+<span class="tech-badge">Grafana</span>
+<span class="tech-badge">Loki</span>
+<span class="tech-badge">Grafana Alloy</span>
+<span class="tech-badge">AlertManager</span>
+
+**Security & Secrets**
+
+<span class="tech-badge">Sealed Secrets</span>
+<span class="tech-badge">Harbor</span>
+<span class="tech-badge">Trivy</span>
+<span class="tech-badge">cert-manager</span>
+<span class="tech-badge">Let's Encrypt</span>
+
+**Data & Backup**
+
+<span class="tech-badge">CloudNativePG</span>
+<span class="tech-badge">PostgreSQL</span>
+<span class="tech-badge">Velero</span>
+<span class="tech-badge">Kopia</span>
+<span class="tech-badge">restic</span>
+<span class="tech-badge">OCI Object Storage</span>
+
+**Applications**
+
+<span class="tech-badge">Backstage</span>
+<span class="tech-badge">n8n</span>
+<span class="tech-badge">miniflux</span>
+<span class="tech-badge">Harbor Registry</span>
