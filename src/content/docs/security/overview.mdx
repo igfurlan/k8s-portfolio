@@ -176,37 +176,13 @@ Cilium's built-in **Hubble** provides network flow visibility — showing which 
 
 {/* IMAGE: Cilium/Hubble network flow visualization (if Hubble UI is accessible) */}
 
-## Backup and Disaster Recovery — Velero + Restic + OCI
+## Backup and Disaster Recovery
 
-Security includes the ability to recover from failures. The backup strategy is multi-layered:
+Security includes the ability to recover from failures. Since this is a single-node cluster with no built-in redundancy, disaster recovery depends entirely on a well-tested backup strategy.
 
-### Layer 1 — Kubernetes Resources (Velero)
+The backup strategy spans four layers — **Velero + Kopia** for Kubernetes resources and PV data, **restic** for raw PVC data and host configuration, and **pg_dumpall** for PostgreSQL logical backups. All data is stored in **OCI Object Storage** (Oracle Cloud, São Paulo region, 20 GB free tier). Backup health is monitored in real time via Prometheus Pushgateway and a custom Grafana dashboard, with Telegram + Gmail alerts for failures.
 
-**Velero** with the **Kopia** backup driver backs up Kubernetes resource definitions and PersistentVolume data. Scheduled backup jobs run for each critical namespace:
-
-```
-velero   cnpg-system-default-kopia-maintain-job   Completed
-velero   harbor-default-kopia-maintain-job         Completed
-velero   n8n-default-kopia-maintain-job            Completed
-velero   postgres-default-kopia-maintain-job       Completed
-velero   velero-default-kopia-maintain-job         Completed
-```
-
-Velero's `node-agent` DaemonSet handles the actual volume data copying.
-
-### Layer 2 — PersistentVolume Data (restic)
-
-The raw PVC data in `/opt/local-path-provisioner/` is backed up daily by **restic** to OCI Object Storage (Oracle Cloud Infrastructure, São Paulo region) — which provides 20 GB of free tier storage.
-
-Backup metrics (success/failure, duration, files changed) are pushed to **Prometheus Pushgateway** after each run, making backup health visible in Grafana and alertable via AlertManager.
-
-### Layer 3 — PostgreSQL Logical Backup (pg_dump)
-
-A daily `pg_dumpall` job creates a logical dump of all PostgreSQL databases. The dump size is tracked as a metric in Prometheus and the dump file is included in the restic host backup.
-
-### Layer 4 — Host Configuration (restic)
-
-The host filesystem configuration (`/home/ifurlan`, `/etc`) is backed up separately using a second restic repository (`restic-host`).
+[Full backup strategy and monitoring documentation →](/k8s-portfolio/backup/strategy/)
 
 ### Alert Coverage
 
@@ -214,8 +190,7 @@ The host filesystem configuration (`/home/ifurlan`, `/etc`) is backed up separat
 |---|---|
 | `BackupFailed` | Any backup job reports `backup_success == 0` |
 | `BackupStale` | More than 48 hours since last successful backup |
-
-{/* IMAGE: Grafana "Homelab Backup & Storage" dashboard showing backup success status for all jobs */}
+| `OCIBucketNearLimit` | Bucket usage > 85% of 20 GB free tier |
 
 ## RBAC and Access Control
 
@@ -233,7 +208,7 @@ Since this is a single-node homelab with a single administrator, RBAC complexity
 | Secrets in Git | Sealed Secrets (asymmetric encryption) |
 | Unscanned images | Harbor + Trivy vulnerability scanning |
 | Expired TLS certs | cert-manager with auto-renewal |
-| Data loss | Velero + restic + OCI Object Storage |
+| Data loss | Velero + Kopia + restic + OCI Object Storage |
 | Network isolation | Cilium NetworkPolicy (eBPF) |
 | Backup failures | Prometheus alerts → Telegram + Gmail |
 | Unauthorized cluster access | kubeconfig on local machine only, no public API server |
@@ -243,6 +218,4 @@ Since this is a single-node homelab with a single administrator, RBAC complexity
 - ArgoCD or `kubectl get sealedsecret -n backstage` showing the backstage-db SealedSecret
 - Harbor UI showing image repository with Trivy scan results and vulnerability counts
 - `kubectl get certificates --all-namespaces` showing all certificates as READY=True
-- Grafana backup dashboard showing all backup jobs as OK/green
 - Cilium/Hubble network flow visualization (optional — requires Hubble UI to be enabled)
-- Velero backup schedule list (`velero backup-location get` or Velero UI if available)

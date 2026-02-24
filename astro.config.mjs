@@ -44,6 +44,12 @@ export default defineConfig({
 						{ label: 'Cluster Security', slug: 'security/overview' },
 					],
 				},
+				{
+					label: '💾 Backup',
+					items: [
+						{ label: 'Backup Strategy & Monitoring', slug: 'backup/strategy' },
+					],
+				},
 			],
 			customCss: ['./src/styles/custom.css'],
 		}),

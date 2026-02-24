@@ -1,0 +1,401 @@
+---
+title: Backup Strategy & Monitoring
+description: Multi-layer backup strategy for the musashi Kubernetes homelab — Velero + Kopia for cluster resources, restic for host files, OCI Object Storage as the destination, and a custom Grafana dashboard to monitor every backup run.
+sidebar:
+  order: 1
+---
+
+import { Badge, Card, CardGrid, Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Backup Strategy & Monitoring
+
+Running a single-node Kubernetes cluster on bare metal means there is no built-in redundancy — no multi-node replication, no managed cloud snapshots. If the disk dies or a namespace is accidentally deleted, recovery depends entirely on backups. This article documents the full backup strategy: what is backed up, how, where, and how every backup run is monitored in real time.
+
+## Why Four Layers?
+
+A single backup approach fails in predictable ways. A Velero cluster snapshot doesn't help if the host OS is corrupted. A raw file copy doesn't capture the Kubernetes resource definitions needed to reassemble the cluster. The strategy is designed so that each layer covers a gap the others leave:
+
+| Layer | What | Tool | Target |
+|---|---|---|---|
+| 1 | Kubernetes resource definitions + PV data | Velero + Kopia | OCI Object Storage |
+| 2 | Raw PVC data (`/opt/local-path-provisioner/`) | restic | OCI Object Storage |
+| 3 | PostgreSQL logical dump | pg_dumpall | Host disk → included in Layer 2 |
+| 4 | Host configuration (`/home/ifurlan`, `/etc`) | restic | OCI Object Storage |
+
+---
+
+## Storage Backend — OCI Object Storage
+
+All remote backup data lands in **Oracle Cloud Infrastructure (OCI) Object Storage**, São Paulo region (`sa-saopaulo-1`). OCI's Always Free tier includes 20 GB of object storage — enough to hold compressed, deduplicated backup repositories across all four layers.
+
+| Property | Value |
+|---|---|
+| Provider | Oracle Cloud Infrastructure |
+| Region | `sa-saopaulo-1` (São Paulo) |
+| Storage class | Standard |
+| Free tier | 20 GB |
+| Cost | $0 |
+
+The bucket is organized by prefix, one per backup job:
+
+| Prefix | Job |
+|---|---|
+| `velero/` | Velero-managed Kopia repository |
+| `restic-k8s/` | Raw PVC data (restic) |
+| `restic-host/` | Host configuration (restic) |
+| `pg-dump/` | PostgreSQL dump files |
+
+OCI access is configured through an API key pair. Credentials are stored as environment variables in the respective systemd service unit files and as a Kubernetes Secret for Velero's `BackupStorageLocation`.
+
+---
+
+## Layer 1 — Velero + Kopia (Kubernetes Resources + Volumes)
+
+**Velero** is the industry-standard Kubernetes backup tool. It captures two categories of data:
+
+- **Resource definitions** — every Kubernetes object in the targeted namespaces (Deployments, Services, ConfigMaps, Secrets, PVCs, CRDs, etc.)
+- **PersistentVolume data** — the actual bytes inside PVCs, using a pluggable backup driver
+
+### Why Kopia Over restic as the Velero Driver?
+
+Velero originally used `restic` as its volume backup driver. Starting with Velero v1.10, **Kopia** became the recommended (and now default) driver. The reasons:
+
+| Feature | restic | Kopia |
+|---|---|---|
+| Deduplication | Chunk-level | Chunk-level |
+| Encryption | AES-256 | AES-256-GCM |
+| Compression | No | Yes (zstd) |
+| Parallel uploads | Limited | Yes (concurrent) |
+| Repository locking | Pessimistic (slow) | Optimistic (fast) |
+| Maintenance jobs | Manual | Automated |
+
+Kopia's parallel upload capability and optimistic locking make it significantly faster for large PVCs. Automated maintenance (compaction, GC) keeps the repository size bounded without cron jobs.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│             velero namespace                │
+│                                             │
+│  ┌─────────────────┐   ┌─────────────────┐  │
+│  │  velero (pod)   │   │  node-agent     │  │
+│  │  - Schedules    │   │  (DaemonSet)    │  │
+│  │  - Orchestrates │   │  - Mounts PVCs  │  │
+│  │  - BackupStorageLocation │  - Kopia   │  │
+│  └────────┬────────┘   └────────┬────────┘  │
+│           │                    │            │
+└───────────┼────────────────────┼────────────┘
+            │                    │
+            ▼                    ▼
+     K8s API (resource     PVC host paths
+     snapshots → S3)       → Kopia repo
+            │                    │
+            └──────────┬─────────┘
+                       ▼
+              OCI Object Storage
+              (velero/ prefix)
+```
+
+The `velero` pod orchestrates backup scheduling and communicates with the Kubernetes API to snapshot resource definitions. The `node-agent` DaemonSet runs on the host and mounts PVC directories directly from the local-path storage paths — bypassing the need for storage-provider snapshots.
+
+### Backup Storage Location
+
+```yaml
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+spec:
+  provider: community.openshift.io/object-store
+  objectStorage:
+    bucket: homelab-backups
+    prefix: velero
+  config:
+    region: sa-saopaulo-1
+    s3Url: https://objectstorage.sa-saopaulo-1.oraclecloud.com
+    s3ForcePathStyle: "true"
+```
+
+### Scheduled Backups per Namespace
+
+Separate schedules are defined for each critical namespace, allowing independent retention policies and granular restore points:
+
+| Schedule | Namespace | Cadence |
+|---|---|---|
+| `backstage-daily` | `backstage` | Daily |
+| `harbor-daily` | `harbor` | Daily |
+| `n8n-daily` | `n8n` | Daily |
+| `postgres-daily` | `postgres` | Daily |
+| `cnpg-system-daily` | `cnpg-system` | Daily |
+| `velero-daily` | `velero` | Daily (includes sealed-secrets backup) |
+
+<Aside type="tip">
+The `velero` namespace schedule includes the `kube-system` namespace resources — most importantly the **sealed-secrets-controller** private key. Without this key, encrypted `SealedSecret` resources in the GitOps repository cannot be decrypted and all credentials would need to be regenerated.
+</Aside>
+
+### Kopia Maintenance Jobs
+
+After each backup, Velero triggers a **maintenance job** that runs compaction and garbage collection on the Kopia repository. These appear as short-lived pods in the `velero` namespace:
+
+```
+velero   backstage-default-kopia-maintain-job   Completed
+velero   harbor-default-kopia-maintain-job       Completed
+velero   n8n-default-kopia-maintain-job          Completed
+velero   postgres-default-kopia-maintain-job     Completed
+velero   cnpg-system-default-kopia-maintain-job  Completed
+velero   velero-default-kopia-maintain-job       Completed
+```
+
+Maintenance keeps the repository lean by removing unreferenced data chunks left by expired or deleted backups.
+
+---
+
+## Layer 2 — restic (Raw PVC Data)
+
+Velero covers Kubernetes-aware backups, but a second restic job backs up the raw PVC data on the host independently. This provides a safety net that doesn't depend on Velero or the Kubernetes API:
+
+```
+/opt/local-path-provisioner/   ←── all PVC data, all namespaces
+        │
+        ▼
+   restic backup
+   (systemd timer: daily)
+        │
+        ▼
+OCI Object Storage (restic-k8s/ prefix)
+```
+
+The backup uses a **restic repository** initialized directly in the OCI bucket. Restic deduplicates and compresses data before uploading, so only changed chunks are sent on each run.
+
+### systemd Timer
+
+The job is managed by a `systemd` timer (`restic-k8s-backup.timer`) that fires the `restic-k8s-backup.service` unit daily. After completing, the service pushes metrics to **Prometheus Pushgateway**:
+
+```bash
+# Metrics pushed after each run
+backup_success{job="restic_k8s_data"} 1
+backup_duration_seconds{job="restic_k8s_data"} 42.3
+backup_files_new{job="restic_k8s_data"} 12
+backup_files_changed{job="restic_k8s_data"} 87
+backup_timestamp{job="restic_k8s_data"} 1748000000
+```
+
+These metrics power the backup monitoring dashboard in Grafana (covered below).
+
+---
+
+## Layer 3 — PostgreSQL Logical Backup (pg_dumpall)
+
+Application data lives in the **CloudNativePG**-managed PostgreSQL cluster (`postgres` namespace). Even though the PVC data is backed up by both Velero (Layer 1) and restic (Layer 2), a **logical dump** adds an extra recovery option: restoring into a clean database instance without needing to replay a PVC snapshot.
+
+A daily systemd timer runs `pg_dumpall` and writes the dump to the host filesystem. The dump file is then automatically included in the Layer 2 restic backup.
+
+```
+pg_dumpall (all databases)
+        │
+        ▼
+/var/backups/pg_dump/dump.sql
+        │
+        ▼
+Included in Layer 2 restic backup
+        │
+        ▼
+OCI Object Storage (restic-k8s/ prefix)
+```
+
+After each run, the dump size is pushed to Pushgateway:
+
+```bash
+pg_dump_size_bytes{job="pg_dump"} 4823042
+pg_dump_success{job="pg_dump"} 1
+pg_dump_duration_seconds{job="pg_dump"} 8.2
+```
+
+The dump size trend in Grafana serves as an early warning: an unexpected drop indicates a database problem, an unexpected spike indicates unusual data growth.
+
+---
+
+## Layer 4 — Host Configuration Backup (restic)
+
+The host OS and user configuration is backed up to a **separate restic repository** (`restic-host/` prefix in OCI). This covers the files that wouldn't exist in a Kubernetes PVC:
+
+| Path | Contents |
+|---|---|
+| `/home/ifurlan` | Shell configs, SSH keys, scripts, dotfiles |
+| `/etc` | System configuration, network settings, systemd units |
+
+A separate restic repository is used (not the same as Layer 2) so that retention and exclusion policies can be tuned independently. Large binary files and cache directories are excluded via a `.resticignore` file.
+
+After each run, metrics are pushed to Pushgateway:
+
+```bash
+backup_success{job="restic_host"} 1
+backup_duration_seconds{job="restic_host"} 15.6
+backup_timestamp{job="restic_host"} 1748000000
+```
+
+---
+
+## OCI Bucket Usage Tracking
+
+A fifth systemd service (`oci-bucket-stats.service`) runs after all backup jobs and queries the OCI API to collect bucket-level statistics. These are pushed to Pushgateway:
+
+```bash
+oci_bucket_size_bytes{prefix="velero"} 1234567890
+oci_bucket_size_bytes{prefix="restic-k8s"} 987654321
+oci_bucket_size_bytes{prefix="restic-host"} 456789012
+oci_bucket_size_bytes{prefix="pg-dump"} 123456789
+oci_bucket_object_count{prefix="velero"} 4821
+oci_bucket_limit_bytes 21474836480
+```
+
+The `oci_bucket_limit_bytes` metric represents the 20 GB OCI free tier ceiling. Tracking the total usage against this limit drives the **OCIBucketNearLimit** alert — fired when usage exceeds 85% of 20 GB.
+
+---
+
+## Backup Monitoring Dashboard
+
+Every backup layer feeds metrics into **Prometheus Pushgateway**, making the full backup posture visible in Grafana. The custom **"Homelab Backup & Storage"** dashboard provides an at-a-glance view of backup health across all jobs.
+
+{/* IMAGE: Custom Grafana "Homelab Backup & Storage" dashboard showing all panels */}
+
+### Dashboard Panels
+
+<CardGrid>
+  <Card title="Backup Status" icon="approve-check">
+    **Type:** Stat panels (one per job)
+
+    Shows **OK** (green) or **FAILED** (red) for each backup job. Backed by `backup_success` from Pushgateway. The most important panels — any red is immediately actionable.
+
+    Jobs tracked: `restic_k8s_data`, `restic_host`, `pg_dump`
+  </Card>
+  <Card title="Time Since Last Backup" icon="clock">
+    **Type:** Stat panels
+
+    Displays how long ago the last successful backup ran, derived from `backup_timestamp`. Color thresholds:
+    - Green: < 25 hours
+    - Yellow: 25–48 hours
+    - Red: > 48 hours
+
+    Red here triggers the `BackupStale` alert in AlertManager.
+  </Card>
+  <Card title="Backup Duration" icon="bars">
+    **Type:** Bar chart (time series)
+
+    Historical backup durations per job. Useful for spotting regressions — a job that suddenly takes 3× longer than usual may indicate a large new file, a slow OCI connection, or repository fragmentation.
+  </Card>
+  <Card title="Backup Files Changed" icon="document">
+    **Type:** Stacked bars
+
+    Shows `files_new` and `files_changed` per restic run. Helps understand backup churn — high change volume correlates with longer backup durations and higher OCI egress.
+  </Card>
+</CardGrid>
+
+<CardGrid>
+  <Card title="PostgreSQL Dump Size" icon="seti:db">
+    **Type:** Line chart
+
+    Tracks `pg_dump_size_bytes` over time. The trend line shows database growth. A sudden drop is a red flag (backup or dump failure); gradual growth is expected and healthy.
+  </Card>
+  <Card title="OCI Bucket Usage vs Limit" icon="warning">
+    **Type:** Gauge
+
+    Shows total OCI bucket usage against the 20 GB free tier ceiling. The gauge turns yellow at 85% and red at 95%, matching the `OCIBucketNearLimit` alert threshold.
+  </Card>
+  <Card title="OCI Bucket Size by Prefix" icon="list-format">
+    **Type:** Pie chart (donut)
+
+    Breaks down bucket usage by prefix (`velero/`, `restic-k8s/`, `restic-host/`, `pg-dump/`). Makes it easy to see which backup layer is consuming the most storage.
+  </Card>
+  <Card title="OCI Bucket Objects by Prefix" icon="bars">
+    **Type:** Bar gauge
+
+    Shows the object count per prefix. Kopia/Velero tends to produce many small objects (chunks); a rapidly growing object count can indicate that maintenance jobs are not running.
+  </Card>
+</CardGrid>
+
+---
+
+## Alerting
+
+Backup alerts are defined in the `homelab-alerts` PrometheusRule and routed by AlertManager to Telegram and Gmail:
+
+| Alert | Condition | Severity |
+|---|---|---|
+| `BackupFailed` | `backup_success == 0` for any job | critical |
+| `BackupStale` | `time() - backup_timestamp > 172800` (48h) | warning |
+| `OCIBucketNearLimit` | Total bucket usage > 85% of 20 GB | warning |
+
+Critical alerts fire immediately to both the Telegram bot (`musashi_homelab_bot`) and Gmail. Warning alerts follow the same path.
+
+<Aside type="caution">
+The `BackupFailed` alert fires if Pushgateway does not receive a `backup_success = 1` value. This means a job that silently stops running (e.g., a crashed systemd unit) will trigger `BackupStale` after 48 hours — providing a second layer of failure detection even if the job never runs at all.
+</Aside>
+
+---
+
+## Recovery Procedures
+
+### Restore a Kubernetes Namespace (Velero)
+
+```bash
+# List available backups
+velero backup get
+
+# Restore a specific namespace from the latest backup
+velero restore create --from-backup <backup-name> \
+  --include-namespaces backstage
+
+# Watch restore progress
+velero restore describe <restore-name>
+```
+
+### Restore Raw PVC Data (restic)
+
+```bash
+# Mount the restic repository and browse snapshots
+restic -r s3:https://objectstorage.sa-saopaulo-1.oraclecloud.com/homelab-backups/restic-k8s \
+  snapshots
+
+# Restore a specific snapshot to a target directory
+restic -r <repo> restore <snapshot-id> \
+  --target /opt/local-path-provisioner/
+```
+
+### Restore PostgreSQL from Logical Dump
+
+```bash
+# Restore into a running PostgreSQL instance
+psql -U postgres < /var/backups/pg_dump/dump.sql
+```
+
+### Restore Host Configuration (restic)
+
+```bash
+restic -r s3:https://objectstorage.sa-saopaulo-1.oraclecloud.com/homelab-backups/restic-host \
+  restore latest --target /
+```
+
+---
+
+## Recovery Point and Time Objectives
+
+| Layer | RPO (max data loss) | RTO (recovery time) |
+|---|---|---|
+| Velero + Kopia | ~24 hours | Minutes (velero restore) |
+| restic PVC backup | ~24 hours | Minutes to hours (depends on PVC size) |
+| pg_dumpall | ~24 hours | Minutes |
+| Host config | ~24 hours | Minutes |
+
+All jobs run daily. RPO is therefore bounded at approximately 24 hours across all layers.
+
+---
+
+## 📸 Images Needed
+
+- Custom "Homelab Backup & Storage" Grafana dashboard (full screenshot showing all stat panels green)
+- Grafana stat panels showing backup status OK for all jobs
+- OCI Object Storage bucket page showing prefix breakdown and total usage
+- `velero backup get` output showing recent successful backups
+- AlertManager showing a fired BackupFailed or BackupStale alert (for illustration)

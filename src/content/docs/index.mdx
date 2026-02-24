@@ -47,9 +47,14 @@ Everything here is the result of hands-on, iterative work. The goal: build infra
     [Read the Observability Stack →](/k8s-portfolio/observability/stack/)
   </Card>
   <Card title="🔒 Cluster Security" icon="shield">
-    Sealed Secrets for GitOps-compatible encrypted secrets, Harbor with Trivy for private image registry and vulnerability scanning, cert-manager for automated TLS, and Velero + restic for multi-layer backup to OCI Object Storage.
+    Sealed Secrets for GitOps-compatible encrypted secrets, Harbor with Trivy for private image registry and vulnerability scanning, cert-manager for automated TLS, and Cilium eBPF for network policy enforcement.
 
     [Read the Security Overview →](/k8s-portfolio/security/overview/)
+  </Card>
+  <Card title="💾 Backup & Recovery" icon="open-book">
+    Four-layer backup strategy: Velero + Kopia for Kubernetes resources and PV data, restic for raw PVC data and host configuration, pg_dumpall for PostgreSQL logical backups — all stored in OCI Object Storage. A custom Grafana dashboard monitors every backup run in real time.
+
+    [Read the Backup Strategy →](/k8s-portfolio/backup/strategy/)
   </Card>
 </CardGrid>
 

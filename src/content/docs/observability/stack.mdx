@@ -173,20 +173,11 @@ Grafana serves as the single pane of glass for all metrics and logs, accessible 
 
 ### Custom Dashboard: Homelab Backup & Storage
 
-A fully custom dashboard tracks the backup and storage posture of the cluster:
+A fully custom dashboard tracks the backup and storage posture of the cluster. It ingests metrics pushed to Pushgateway by all four backup layers — Velero + Kopia, restic PVC data, pg_dumpall, and host configuration — and surfaces backup status, duration trends, PostgreSQL dump size over time, and OCI Object Storage usage against the 20 GB free tier limit.
 
-| Panel | Type | What It Shows |
-|---|---|---|
-| Backup Status | Stat | OK/FAILED per backup job (color-coded) |
-| Time Since Last Backup | Stat | Green < 25h, yellow < 48h, red > 48h |
-| Backup Duration | Bar chart | Historical duration per job |
-| Backup Files (New + Changed) | Stacked bars | File change volume per run |
-| PostgreSQL Dump Size | Line chart | pg_dumpall file size over time |
-| OCI Bucket Usage vs Limit | Gauge | Used vs 20 GB OCI free tier |
-| OCI Bucket Size by Prefix | Pie chart (donut) | Breakdown by backup prefix |
-| OCI Bucket Objects by Prefix | Bar gauge | Object count per prefix |
+[Full dashboard documentation and panel breakdown →](/k8s-portfolio/backup/strategy/)
 
-{/* IMAGE: Custom Grafana dashboard showing backup status panels and OCI bucket usage gauge */}
+{/* IMAGE: Custom Grafana "Homelab Backup & Storage" dashboard */}
 
 ### Pre-built Dashboards (from kube-prometheus-stack)
 
