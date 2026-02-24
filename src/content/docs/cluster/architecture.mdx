@@ -40,12 +40,11 @@ kubeadm gives full control over the cluster configuration. Unlike k3s or microk8
 
 ## Networking — Cilium CNI
 
-The CNI plugin is **Cilium**, running as a DaemonSet in `kube-system`. Cilium was chosen for several reasons:
+The CNI plugin is **Cilium**, running as a DaemonSet in `kube-system`. Cilium handles pod networking and NetworkPolicy enforcement; standard `kube-proxy` is used for service routing. Cilium was chosen for:
 
-- **eBPF-based dataplane** — replaces kube-proxy entirely for routing and load balancing, reducing overhead and improving observability
-- **Native network policies** — Cilium enforces NetworkPolicy CRDs and extends them with CiliumNetworkPolicy
-- **Built-in Hubble** — deep flow visibility without additional tooling
-- **Ingress controller integration** — Cilium provides a `cilium-ingress` LoadBalancer service on ports 80/443
+- **NetworkPolicy enforcement** — enforces standard `NetworkPolicy` CRDs and extends them with `CiliumNetworkPolicy` for L7-aware rules
+- **eBPF-based packet processing** — efficient kernel-level dataplane for pod-to-pod traffic
+- **Operational maturity** — well-established in production Kubernetes environments
 
 ```
 kube-system   cilium                  DaemonSet    1/1 Running   69d
@@ -198,7 +197,7 @@ Grouped by function:
 | `cert-manager` | cert-manager, cainjector, webhook | TLS certificate automation |
 | `kube-system` | sealed-secrets-controller | Encrypted Kubernetes secrets |
 | `harbor` | harbor-core, registry, trivy, jobservice, portal | Private container registry + vulnerability scanning |
-| `kube-system` | cilium (DaemonSet), cilium-operator | eBPF networking and network policy |
+| `kube-system` | cilium (DaemonSet), cilium-operator | Pod networking (CNI) and NetworkPolicy enforcement |
 
 ### Data Platform
 

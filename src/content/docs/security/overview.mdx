@@ -157,11 +157,7 @@ Certificates are automatically renewed by cert-manager before expiry. The renewa
 
 ## Network Security — Cilium
 
-The **Cilium** CNI is more than just a pod networking plugin. Its eBPF-based dataplane provides:
-
-### eBPF-Based kube-proxy Replacement
-
-Cilium completely replaces `kube-proxy` for service load balancing. Service routing is implemented in eBPF programs attached to the kernel's network stack, bypassing the overhead of iptables rules.
+**Cilium** is used as the CNI plugin, responsible for pod networking and `NetworkPolicy` enforcement. The standard `kube-proxy` handles service routing. Cilium's role here is network isolation — restricting which pods and namespaces can communicate with each other and with the outside world.
 
 ### Network Policy Enforcement
 
@@ -170,11 +166,117 @@ Cilium enforces standard Kubernetes `NetworkPolicy` resources and extends them w
 - Which namespaces can communicate
 - Which external IPs are reachable from the cluster
 
-### Hubble Observability
+This means a compromised application pod cannot freely reach other workloads, databases, or the Kubernetes API — traffic must be explicitly allowed.
 
-Cilium's built-in **Hubble** provides network flow visibility — showing which pods are communicating, on which ports, and whether traffic was allowed or dropped by network policy. This is invaluable for debugging connectivity issues and auditing network access patterns.
+## API Server Audit Logging
 
-{/* IMAGE: Cilium/Hubble network flow visualization (if Hubble UI is accessible) */}
+The **kube-apiserver** is configured with an audit policy that records every significant request made to the Kubernetes API — who made it, what resource was affected, and what the outcome was. On a kubeadm cluster, this is enabled by adding `--audit-policy-file` and `--audit-log-path` to the API server's static pod manifest.
+
+### Audit Policy
+
+The audit policy defines what events to capture at what verbosity level. Four verbosity levels exist:
+
+| Level | What is recorded |
+|---|---|
+| `None` | Request is not logged |
+| `Metadata` | Request metadata only (user, verb, resource, time) — no request/response body |
+| `Request` | Metadata + request body |
+| `RequestResponse` | Metadata + request body + response body |
+
+A typical policy logs high-sensitivity operations at full verbosity while keeping noise low for read-heavy resources:
+
+```yaml
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  # Do not log read-only requests to non-sensitive resources
+  - level: None
+    verbs: ["get", "list", "watch"]
+    resources:
+      - group: ""
+        resources: ["endpoints", "services", "configmaps"]
+
+  # Full detail for Secret access
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["secrets"]
+
+  # Metadata for everything else
+  - level: Metadata
+```
+
+### Why Audit Logging Matters
+
+Without audit logs, there is no post-incident record of what happened in the cluster. Audit logging answers:
+- Which user or ServiceAccount created, modified, or deleted a resource?
+- Were any Secrets accessed or exported?
+- Did any pod exec into a running container?
+- Were any RBAC rules changed?
+
+On musashi, audit logs are written to the host filesystem and collected by **Grafana Alloy** (via the systemd journal or log file scraping) and forwarded to **Loki**, making them queryable from Grafana alongside application logs.
+
+<Aside type="note">
+`kubectl exec`, `kubectl port-forward`, and `kubectl attach` generate `create` events on the `pods/exec`, `pods/portforward`, and `pods/attach` subresources — these are logged at `Metadata` level or higher, giving a record of interactive access to running containers.
+</Aside>
+
+## etcd Encryption at Rest
+
+By default, Kubernetes stores everything in etcd as plain JSON — including `Secret` objects. Anyone with read access to the etcd data directory (e.g., from a disk snapshot or physical access to the node) can extract all Secrets in plaintext using `etcdctl`.
+
+**Encryption at rest** solves this by encrypting the data before it is written to etcd. On musashi, this is configured via the `--encryption-provider-config` flag on the kube-apiserver static pod, pointing to an `EncryptionConfiguration` manifest.
+
+### EncryptionConfiguration
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: <base64-encoded-32-byte-key>
+      - identity: {}
+```
+
+How this works:
+1. When a `Secret` is written to etcd, the kube-apiserver encrypts it using **AES-CBC** with a 32-byte key before storing it.
+2. When a `Secret` is read, the kube-apiserver decrypts it in memory before returning it to the caller.
+3. The `identity: {}` provider at the end allows reading pre-existing unencrypted secrets during a migration — once all secrets are re-written, it can be removed.
+
+### Verifying Encryption
+
+After enabling encryption and re-writing existing secrets, you can verify that etcd no longer stores them in plaintext:
+
+```bash
+# Read the raw etcd value for a secret
+ETCDCTL_API=3 etcdctl \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  get /registry/secrets/default/my-secret | hexdump -C | head
+
+# An encrypted secret starts with the prefix: k8s:enc:aescbc:v1:key1:...
+# A plaintext secret starts with: {"kind":"Secret"...
+```
+
+### Why This Is Important
+
+| Scenario | Without encryption | With encryption |
+|---|---|---|
+| Physical access to node disk | All Secrets readable | Ciphertext only — key required |
+| etcd backup/snapshot leak | All Secrets readable | Ciphertext only |
+| Etcd port exposed (misconfiguration) | All Secrets readable | Ciphertext only |
+| kubectl get secret | Works normally | Works normally (decrypted in memory) |
+
+Encryption at rest is a complementary control to RBAC: RBAC prevents unauthorized API access, while encryption at rest protects the data if the storage layer is compromised independently of the API.
+
+<Aside type="caution">
+The encryption key is stored on the host filesystem (referenced by the kube-apiserver manifest). If an attacker gains root on the node, they can read the key. Encryption at rest is a defense against storage-layer attacks (disk theft, leaked etcd backups) — not against a fully compromised host. A key management service (KMS) plugin would address the latter.
+</Aside>
 
 ## Backup and Disaster Recovery
 
@@ -209,13 +311,16 @@ Since this is a single-node homelab with a single administrator, RBAC complexity
 | Unscanned images | Harbor + Trivy vulnerability scanning |
 | Expired TLS certs | cert-manager with auto-renewal |
 | Data loss | Velero + Kopia + restic + OCI Object Storage |
-| Network isolation | Cilium NetworkPolicy (eBPF) |
+| Network isolation | Cilium NetworkPolicy (pod-level traffic control) |
 | Backup failures | Prometheus alerts → Telegram + Gmail |
 | Unauthorized cluster access | kubeconfig on local machine only, no public API server |
+| API activity visibility | kube-apiserver audit logging → Loki |
+| Secrets at rest | etcd encryption at rest (AES-CBC) |
 
 ## 📸 Images Needed
 
 - ArgoCD or `kubectl get sealedsecret -n backstage` showing the backstage-db SealedSecret
 - Harbor UI showing image repository with Trivy scan results and vulnerability counts
 - `kubectl get certificates --all-namespaces` showing all certificates as READY=True
-- Cilium/Hubble network flow visualization (optional — requires Hubble UI to be enabled)
+- Grafana/Loki showing audit log entries (e.g., a `kubectl exec` or Secret access event)
+- `etcdctl get /registry/secrets/...` output showing the `k8s:enc:aescbc:v1:` prefix (confirming encryption)

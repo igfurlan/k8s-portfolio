@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" width="480" height="480" role="img" aria-label="Terminal showing kubectl output with Kubernetes logo">
+
+  <!-- Terminal window frame -->
+  <rect x="14" y="14" width="312" height="252" rx="10" ry="10" fill="#0d1117" />
+
+  <!-- Title bar -->
+  <rect x="14" y="14" width="312" height="34" rx="10" ry="10" fill="#161b22" />
+  <!-- Square off the bottom corners of the title bar -->
+  <rect x="14" y="36" width="312" height="12" fill="#161b22" />
+
+  <!-- Traffic light dots -->
+  <circle cx="36" cy="31" r="5.5" fill="#ff5f57" />
+  <circle cx="54" cy="31" r="5.5" fill="#ffbd2e" />
+  <circle cx="72" cy="31" r="5.5" fill="#28c840" />
+
+  <!-- Title text -->
+  <text x="170" y="35" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="11" fill="#64748b" text-anchor="middle">musashi — kubectl</text>
+
+  <!-- Separator line under title bar -->
+  <line x1="14" y1="48" x2="326" y2="48" stroke="#21262d" stroke-width="1" />
+
+  <!-- Terminal content -->
+
+  <!-- Prompt 1 -->
+  <text x="26" y="70" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#3b82f6">$</text>
+  <text x="36" y="70" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c9d1d9"> kubectl get pods -A</text>
+
+  <!-- Header -->
+  <text x="26" y="86" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#58677e">NAMESPACE    NAME                   READY  STATUS</text>
+
+  <!-- Rows -->
+  <text x="26" y="101" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">argocd       argocd-server-7d4f5    1/1    Running</text>
+  <text x="26" y="116" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">monitoring   prometheus-0           1/1    Running</text>
+  <text x="26" y="131" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">monitoring   grafana-6c5b9          1/1    Running</text>
+  <text x="26" y="146" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">harbor       harbor-core-5c2d       1/1    Running</text>
+  <text x="26" y="161" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">velero       velero-8f9a2           1/1    Running</text>
+  <text x="26" y="176" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">backstage    backstage-7bc4d        1/1    Running</text>
+
+  <!-- Prompt 2 -->
+  <text x="26" y="199" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#3b82f6">$</text>
+  <text x="36" y="199" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c9d1d9"> kubectl get nodes</text>
+
+  <!-- Node header -->
+  <text x="26" y="215" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#58677e">NAME     STATUS  ROLES           VERSION</text>
+
+  <!-- Node row -->
+  <text x="26" y="230" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">musashi  Ready   control-plane   v1.34.3</text>
+
+  <!-- Prompt 3 + cursor -->
+  <text x="26" y="249" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#3b82f6">$</text>
+  <rect x="38" y="238" width="7" height="13" fill="#3b82f6" rx="1" opacity="0.85" />
+
+  <!-- ===================== K8s badge ===================== -->
+
+  <!-- Outer glow ring (decorative, subtle) -->
+  <circle cx="375" cy="345" r="112" fill="none" stroke="#326CE5" stroke-width="1" opacity="0.15" />
+  <circle cx="375" cy="345" r="106" fill="none" stroke="#326CE5" stroke-width="1" opacity="0.25" />
+
+  <!-- Badge background — sits on top of terminal corner -->
+  <circle cx="375" cy="345" r="100" fill="#0d1117" />
+  <!-- Badge border -->
+  <circle cx="375" cy="345" r="100" fill="none" stroke="#1a2744" stroke-width="2" />
+
+  <!-- K8s outer ring -->
+  <circle cx="375" cy="345" r="86" fill="none" stroke="#326CE5" stroke-width="8" />
+
+  <!-- K8s spokes (7, from r=24 to r=70, tips at r=70) -->
+  <!-- Spoke 0: 0° (north) -->
+  <line x1="375.0" y1="321.0" x2="375.0" y2="275.0" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="375.0" cy="275.0" r="5" fill="#326CE5"/>
+
+  <!-- Spoke 1: 51.43° -->
+  <line x1="393.8" y1="330.0" x2="429.8" y2="300.4" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="429.8" cy="300.4" r="5" fill="#326CE5"/>
+
+  <!-- Spoke 2: 102.86° -->
+  <line x1="398.2" y1="350.3" x2="443.2" y2="360.6" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="443.2" cy="360.6" r="5" fill="#326CE5"/>
+
+  <!-- Spoke 3: 154.29° -->
+  <line x1="385.1" y1="366.2" x2="404.3" y2="408.1" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="404.3" cy="408.1" r="5" fill="#326CE5"/>
+
+  <!-- Spoke 4: 205.71° -->
+  <line x1="364.9" y1="366.2" x2="345.7" y2="408.1" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="345.7" cy="408.1" r="5" fill="#326CE5"/>
+
+  <!-- Spoke 5: 257.14° -->
+  <line x1="351.8" y1="350.3" x2="306.8" y2="360.6" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="306.8" cy="360.6" r="5" fill="#326CE5"/>
+
+  <!-- Spoke 6: 308.57° -->
+  <line x1="356.2" y1="330.0" x2="320.2" y2="300.4" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="320.2" cy="300.4" r="5" fill="#326CE5"/>
+
+  <!-- K8s center hub -->
+  <circle cx="375" cy="345" r="22" fill="#326CE5" />
+
+</svg>

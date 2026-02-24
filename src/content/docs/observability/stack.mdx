@@ -108,7 +108,7 @@ The Prometheus Operator manages scrape configurations through `ServiceMonitor` r
 | `traefik` | Traefik request metrics (used by Argo Rollouts canary analysis) |
 
 <Aside type="note">
-Four kube-prometheus-stack monitors were intentionally disabled: `kubeControllerManager`, `kubeScheduler`, `kubeEtcd`, and `kubeProxy`. On a single-node kubeadm cluster, these components bind to `127.0.0.1`, making them unreachable from the Prometheus pod. Cilium replaces kube-proxy entirely.
+Four kube-prometheus-stack monitors were intentionally disabled: `kubeControllerManager`, `kubeScheduler`, `kubeEtcd`, and `kubeProxy`. On a single-node kubeadm cluster, these components bind to `127.0.0.1`, making them unreachable from the Prometheus pod.
 </Aside>
 
 ## Logs — Loki + Grafana Alloy

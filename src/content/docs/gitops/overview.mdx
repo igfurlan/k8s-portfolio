@@ -167,26 +167,26 @@ The rollout progresses through 3 traffic weight stages, pausing at each to obser
 
 The `AnalysisTemplate` (`backstage-canary-check`) queries **Prometheus** at 30-second intervals throughout the canary rollout. Three metrics are evaluated:
 
-<CardGrid>
-  <Card title="Error Rate" icon="warning">
-    **Metric:** HTTP 5xx error rate on Traefik service requests
-    **Query:** `sum(rate(traefik_service_requests_total{...code=~"5.."}[2m])) / sum(rate(...))`
-    **Threshold:** ≤ 25% error rate (`result[0] <= 0.25`)
-    **Failure limit:** 3 consecutive failures before rollback
-  </Card>
-  <Card title="p95 Latency" icon="rocket">
-    **Metric:** 95th percentile request duration via Traefik histogram
-    **Query:** `histogram_quantile(0.95, sum(rate(traefik_service_request_duration_seconds_bucket{...}[2m])) by (le))`
-    **Threshold:** ≤ 5 seconds
-    **Failure limit:** 3 consecutive failures before rollback
-  </Card>
-  <Card title="Pod Restarts" icon="seti:shell">
-    **Metric:** Container restart count increase in the backstage namespace
-    **Query:** `sum(increase(kube_pod_container_status_restarts_total{namespace="backstage",...}[2m]))`
-    **Threshold:** < 2 restarts
-    **Failure limit:** 2 consecutive failures before rollback
-  </Card>
-</CardGrid>
+<Card title="Error Rate" icon="warning">
+  **Metric:** HTTP 5xx error rate on Traefik service requests
+  **Query:** `sum(rate(traefik_service_requests_total{...code=~"5.."}[2m])) / sum(rate(...))`
+  **Threshold:** ≤ 25% error rate (`result[0] <= 0.25`)
+  **Failure limit:** 3 consecutive failures before rollback
+</Card>
+
+<Card title="p95 Latency" icon="rocket">
+  **Metric:** 95th percentile request duration via Traefik histogram
+  **Query:** `histogram_quantile(0.95, sum(rate(traefik_service_request_duration_seconds_bucket{...}[2m])) by (le))`
+  **Threshold:** ≤ 5 seconds
+  **Failure limit:** 3 consecutive failures before rollback
+</Card>
+
+<Card title="Pod Restarts" icon="seti:shell">
+  **Metric:** Container restart count increase in the backstage namespace
+  **Query:** `sum(increase(kube_pod_container_status_restarts_total{namespace="backstage",...}[2m]))`
+  **Threshold:** < 2 restarts
+  **Failure limit:** 2 consecutive failures before rollback
+</Card>
 
 If any metric exceeds its threshold too many times, the AnalysisRun fails and Argo Rollouts **automatically rolls back** to the previous stable version — without any human intervention.
 
