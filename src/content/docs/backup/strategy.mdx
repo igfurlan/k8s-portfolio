@@ -7,7 +7,6 @@ sidebar:
 
 import { Badge, Card, CardGrid, Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
-# Backup Strategy & Monitoring
 
 Running a single-node Kubernetes cluster on bare metal means there is no built-in redundancy — no multi-node replication, no managed cloud snapshots. If the disk dies or a namespace is accidentally deleted, recovery depends entirely on backups. This article documents the full backup strategy: what is backed up, how, where, and how every backup run is monitored in real time.
 
@@ -76,23 +75,23 @@ Kopia's parallel upload capability and optimistic locking make it significantly 
 ### Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│             velero namespace                │
-│                                             │
-│  ┌─────────────────┐   ┌─────────────────┐  │
-│  │  velero (pod)   │   │  node-agent     │  │
-│  │  - Schedules    │   │  (DaemonSet)    │  │
-│  │  - Orchestrates │   │  - Mounts PVCs  │  │
-│  │  - BackupStorageLocation │  - Kopia   │  │
-│  └────────┬────────┘   └────────┬────────┘  │
-│           │                    │            │
-└───────────┼────────────────────┼────────────┘
-            │                    │
-            ▼                    ▼
-     K8s API (resource     PVC host paths
-     snapshots → S3)       → Kopia repo
-            │                    │
-            └──────────┬─────────┘
+┌──────────────────────────────────────────────────────┐
+│             velero namespace                         │
+│                                                      │
+│  ┌──────────────────────────┐   ┌─────────────────┐  │
+│  │  velero (pod)            │   │  node-agent     │  │
+│  │  - Schedules             │   │  (DaemonSet)    │  │
+│  │  - Orchestrates          │   │  - Mounts PVCs  │  │
+│  │  - BackupStorageLocation │   │  - Kopia        │  │
+│  └────────┬─────────────────┘   └───────┬─────────┘  │
+│           │                             │            │
+└───────────┼─────────────────────────────┼────────────┘
+            │                             │
+            ▼                             ▼
+     K8s API (resource              PVC host paths
+     snapshots → S3)                → Kopia repo
+            │                             │
+            └──────────┬──────────────────┘
                        ▼
               OCI Object Storage
               (velero/ prefix)
