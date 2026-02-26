@@ -7,7 +7,6 @@ sidebar:
 
 import { Badge, Card, CardGrid, Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
-# GitOps with ArgoCD & Argo Rollouts
 
 GitOps is the operational model where Git is the single source of truth for both application and infrastructure state. Every change to a running system is made through a Git commit — never by running `kubectl apply` directly against the cluster. The cluster continuously reconciles its actual state against the desired state declared in Git.
 
@@ -24,7 +23,6 @@ The GitOps workflow is split across two GitHub repositories:
 
 This separation is intentional: it decouples the application lifecycle (builds, tests) from the deployment lifecycle (manifest changes, environment promotions). ArgoCD only watches the GitOps repo — it never has access to the application source code.
 
-![GitHub Actions CI pipeline — validate job confirming the app repo → CI → gitops repo flow](/k8s-portfolio/images/ci-pipeline-validate.png)
 
 ## GitOps Repository Structure
 
@@ -134,6 +132,8 @@ The pipeline uses GitHub Actions cache (`type=gha`) for Docker layer caching. Bu
     git push
 ```
 
+![GitHub Actions CI pipeline — validate job confirming the app repo → CI → gitops repo flow](/k8s-portfolio/images/ci-pipeline-validate.png)
+
 ![GitHub Actions CI run after merge to main — all steps passing: build, push to GHCR, gitops update](/k8s-portfolio/images/ci-pipeline-merged-pr.png)
 
 ## Argo Rollouts — Canary Deployment Strategy
@@ -226,37 +226,10 @@ The sealed data can only be decrypted by the cluster that holds the correspondin
 
 ![SealedSecret resource — backstage-db sealed secret as seen in the cluster](/k8s-portfolio/images/sealed-secrets.png)
 
-## End-to-End Flow Summary
+## End-to-End Flow 
 
-```
-Developer pushes to main (backstage repo)
-        │
-        ▼
-GitHub Actions CI
-  ├─ Build Docker image
-  ├─ Push to GHCR (ghcr.io/igfurlan/backstage:sha-abc123)
-  ├─ Clone backstage-gitops repo
-  ├─ Update image tag in overlays/production
-  └─ Commit & push "deploy: backstage sha-abc123"
-        │
-        ▼
-ArgoCD detects change in backstage-gitops
-  └─ Applies Kustomize overlay to cluster
-        │
-        ▼
-Argo Rollouts starts canary rollout
-  ├─ Step 1: 20% traffic → new version
-  ├─ AnalysisRun: query Prometheus every 30s
-  │    ├─ error-rate ≤ 0.25 ✓
-  │    ├─ p95 latency ≤ 5s ✓
-  │    └─ pod-restarts < 2 ✓
-  ├─ Step 2: 50% traffic (after 60s)
-  ├─ Step 3: 80% traffic (after 60s)
-  └─ Step 4: 100% promotion (after 30s)
-        │
-        ▼
-New version fully deployed — zero downtime
-```
+![gitops flow diagram](/k8s-portfolio/images/gitops-diagram.png)
+
 
 <Aside type="tip">
 If any Prometheus metric threshold is breached during the canary analysis, Argo Rollouts automatically aborts the rollout and reverts traffic to 100% stable — without any manual intervention.

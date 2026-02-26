@@ -7,7 +7,6 @@ sidebar:
 
 import { Badge, Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
-# Cluster Architecture Overview
 
 This homelab runs a single-node, production-grade Kubernetes cluster on bare metal. The goal is to mirror real-world platform engineering practices — GitOps, observability, automated deployments, and secure secret management — in a resource-constrained environment.
 
@@ -39,6 +38,7 @@ musashi   Ready    control-plane   69d   v1.34.3   192.168.1.133   Fedora Linux 
 kubeadm gives full control over the cluster configuration. Unlike k3s or microk8s, every component (etcd, kube-apiserver, kube-scheduler, kube-controller-manager) runs as a standard Kubernetes pod — which is ideal for learning operational patterns that apply directly to production kubeadm clusters.
 
 ## Networking — Cilium CNI
+
 
 The CNI plugin is **Cilium**, running as a DaemonSet in `kube-system`. Cilium handles pod networking and NetworkPolicy enforcement; standard `kube-proxy` is used for service routing. Cilium was chosen for:
 
@@ -122,48 +122,8 @@ Active certificates:
 
 ## Conceptual Architecture Diagram
 
-```
-                    Internet
-                       │
-              Cloudflare Edge
-              (TLS termination)
-                       │
-              cloudflared tunnel
-              (systemd, host)
-                       │
-    ┌──────────────────┴────────────────────┐
-    │           musashi (192.168.1.133)     │
-    │  Kubernetes v1.34.3 / containerd      │
-    │                                       │
-    │  ┌─────────────────────────────────┐  │
-    │  │   Traefik (Gateway API)         │  │
-    │  │   :30080 / :30443               │  │
-    │  └──────┬──────────────────────────┘  │
-    │         │  HTTPRoute dispatch         │
-    │  ┌──────▼──────────────────────────┐  │
-    │  │         Workloads               │  │
-    │  │  argocd  │  backstage           │  │
-    │  │  harbor  │  grafana             │  │
-    │  │  n8n     │  miniflux            │  │
-    │  └─────────────────────────────────┘  │
-    │                                       │
-    │  ┌───────────┐  ┌────────────────┐   │
-    │  │  Cilium   │  │  cert-manager  │   │
-    │  │  (eBPF)   │  │  (TLS certs)   │   │
-    │  └───────────┘  └────────────────┘   │
-    │                                       │
-    │  ┌───────────────────────────────┐   │
-    │  │  Monitoring (monitoring ns)   │   │
-    │  │  Prometheus │ Grafana │ Loki  │   │
-    │  │  Alloy │ AlertManager         │   │
-    │  └───────────────────────────────┘   │
-    │                                       │
-    │  ┌───────────────────────────────┐   │
-    │  │  local-path provisioner       │   │
-    │  │  /opt/local-path-provisioner/ │   │
-    │  └───────────────────────────────┘   │
-    └───────────────────────────────────────┘
-```
+![network visual diagram](/k8s-portfolio/images/network-diagram.png)
+
 
 ## All Running Workloads
 
