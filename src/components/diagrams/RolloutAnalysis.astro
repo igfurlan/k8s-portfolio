@@ -1,0 +1,83 @@
+---
+/**
+ * What Argo Rollouts asks Prometheus during a canary, and what each answer does.
+ * Replaces an ASCII flow whose query box drifted out of alignment.
+ */
+---
+
+<figure class="dg-wrap">
+  <svg class="dg" viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" role="img"
+       aria-label="A canary deployment starts, Argo Rollouts creates an AnalysisRun which queries Prometheus every thirty seconds for error rate, p95 latency and pod restarts. Passing all three promotes the canary to 100 percent; failing any one aborts and reverts to the stable version.">
+    <defs>
+      <marker id="ra-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head" points="0,0 8,4 0,8"></polygon>
+      </marker>
+      <marker id="ra-w" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head-warn" points="0,0 8,4 0,8"></polygon>
+      </marker>
+    </defs>
+
+    <rect class="dg-box" x="16" y="30" width="190" height="56" rx="4"></rect>
+    <text class="dg-t" x="111" y="54" text-anchor="middle">Canary starts</text>
+    <text class="dg-c" x="111" y="70" text-anchor="middle">NEW REPLICASET, 20% OF TRAFFIC</text>
+
+    <path class="dg-e" d="M111 86 L111 126" marker-end="url(#ra-a)"></path>
+
+    <rect class="dg-box-2" x="16" y="128" width="190" height="56" rx="4"></rect>
+    <text class="dg-t" x="111" y="152" text-anchor="middle">AnalysisRun</text>
+    <text class="dg-c" x="111" y="168" text-anchor="middle">CREATED BY ARGO ROLLOUTS</text>
+
+    <path class="dg-e" d="M206 156 L266 156" marker-end="url(#ra-a)"></path>
+    <text class="dg-l" x="236" y="148" text-anchor="middle">every 30s</text>
+
+    <!-- the three gates -->
+    <rect class="dg-group" x="270" y="24" width="392" height="266" rx="6"></rect>
+    <text class="dg-c" x="284" y="44">PROMETHEUS QUERIES — ALL THREE MUST PASS</text>
+
+    <rect class="dg-box" x="286" y="56" width="360" height="66" rx="4"></rect>
+    <text class="dg-t-s" x="300" y="78">error rate</text>
+    <text class="dg-l" x="300" y="96">traefik_service_requests_total{code=~"5.."}</text>
+    <text class="dg-l" x="300" y="112">÷ traefik_service_requests_total</text>
+    <text class="dg-t-s" x="632" y="78" text-anchor="end">≤ 0.25</text>
+
+    <rect class="dg-box" x="286" y="132" width="360" height="66" rx="4"></rect>
+    <text class="dg-t-s" x="300" y="154">p95 latency</text>
+    <text class="dg-l" x="300" y="172">histogram_quantile(0.95,</text>
+    <text class="dg-l" x="300" y="188">  traefik_service_request_duration_bucket)</text>
+    <text class="dg-t-s" x="632" y="154" text-anchor="end">≤ 5s</text>
+
+    <rect class="dg-box" x="286" y="208" width="360" height="52" rx="4"></rect>
+    <text class="dg-t-s" x="300" y="230">pod restarts</text>
+    <text class="dg-l" x="300" y="248">kube_pod_container_status_restarts_total</text>
+    <text class="dg-t-s" x="632" y="230" text-anchor="end">&lt; 2</text>
+
+    <!-- outcomes -->
+    <path class="dg-e" d="M662 110 L724 110" marker-end="url(#ra-a)"></path>
+    <text class="dg-l" x="693" y="102" text-anchor="middle">pass</text>
+
+    <rect class="dg-box" x="728" y="80" width="156" height="60" rx="4"></rect>
+    <text class="dg-t" x="806" y="104" text-anchor="middle">Promote</text>
+    <text class="dg-c" x="806" y="120" text-anchor="middle">STEP UP TO 100%</text>
+    <text class="dg-c" x="806" y="132" text-anchor="middle">STABLE = CANARY</text>
+
+    <path class="dg-e-warn" d="M662 216 L724 216" marker-end="url(#ra-w)"></path>
+    <text class="dg-l-warn" x="693" y="208" text-anchor="middle">fail</text>
+
+    <rect class="dg-box" x="728" y="186" width="156" height="60" rx="4"></rect>
+    <text class="dg-t" x="806" y="210" text-anchor="middle">Abort</text>
+    <text class="dg-c" x="806" y="226" text-anchor="middle">TRAFFIC BACK TO STABLE</text>
+    <text class="dg-c" x="806" y="238" text-anchor="middle">NO HUMAN NEEDED</text>
+
+    <text class="dg-c" x="16" y="322">A FAILING METRIC DOES NOT PAGE ANYONE — IT STOPS THE RELEASE.</text>
+    <text class="dg-c" x="16" y="340">THE ALERT THAT WOULD HAVE WOKEN SOMEONE UP AT 3AM NEVER FIRES, BECAUSE THE CHANGE NEVER FINISHES SHIPPING.</text>
+    <text class="dg-c" x="16" y="368">THE THRESHOLDS ARE DELIBERATELY LOOSE FOR A HOMELAB WHERE TRAFFIC IS SPARSE — ON A BUSY SERVICE,</text>
+    <text class="dg-c" x="16" y="384">A 25% ERROR BUDGET WOULD BE ABSURD, AND THE POINT IS THE MECHANISM RATHER THAN THE NUMBER.</text>
+  </svg>
+
+  <figcaption class="dg-cap-under">
+    The analysis runs while traffic is already split, so the queries measure the canary under
+    real load rather than a synthetic check. Every thirty seconds all three must hold; one
+    failure ends the rollout and returns traffic to the stable version without anyone being
+    asked.
+  </figcaption>
+</figure>

@@ -1,0 +1,122 @@
+---
+/**
+ * The path from a commit to a promoted canary.
+ *
+ * Redrawn from the earlier PNG. Harbor is no longer in the loop — images go to
+ * GHCR and stay there — so the mirror step is gone rather than shown retired,
+ * since this diagram describes the pipeline as it runs today.
+ */
+---
+
+<figure class="dg-wrap">
+  <svg class="dg" viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg" role="img"
+       aria-label="A developer pushes to the app repository, GitHub Actions builds and pushes an image to GHCR then patches the image tag in the GitOps repository. ArgoCD syncs that repository into the cluster and applies an Argo Rollout, which splits canary traffic while querying Prometheus and promotes or rolls back on the result.">
+    <defs>
+      <marker id="gf-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head" points="0,0 8,4 0,8"></polygon>
+      </marker>
+      <marker id="gf-b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head-bg" points="0,0 8,4 0,8"></polygon>
+      </marker>
+      <marker id="gf-w" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head-warn" points="0,0 8,4 0,8"></polygon>
+      </marker>
+    </defs>
+
+    <!-- ── CI ──────────────────────────────────────────────────── -->
+    <rect class="dg-group-2" x="16" y="30" width="868" height="112" rx="6"></rect>
+    <text class="dg-c" x="30" y="50">CI — GITHUB ACTIONS, ON THE APPLICATION REPOSITORY</text>
+
+    <rect class="dg-box" x="32" y="62" width="112" height="58" rx="4"></rect>
+    <text class="dg-t" x="88" y="86" text-anchor="middle">Developer</text>
+    <text class="dg-c" x="88" y="102" text-anchor="middle">GIT PUSH → PR</text>
+
+    <path class="dg-e" d="M144 91 L186 91" marker-end="url(#gf-a)"></path>
+
+    <rect class="dg-box" x="190" y="62" width="130" height="58" rx="4"></rect>
+    <text class="dg-t" x="255" y="86" text-anchor="middle">App repo</text>
+    <text class="dg-c" x="255" y="102" text-anchor="middle">backstage-app</text>
+
+    <path class="dg-e" d="M320 91 L368 91" marker-end="url(#gf-a)"></path>
+    <text class="dg-l" x="344" y="83" text-anchor="middle">merge</text>
+
+    <rect class="dg-box" x="372" y="62" width="150" height="58" rx="4"></rect>
+    <text class="dg-t" x="447" y="86" text-anchor="middle">GitHub Actions</text>
+    <text class="dg-c" x="447" y="102" text-anchor="middle">TEST · BUILD · SCAN</text>
+
+    <path class="dg-e" d="M522 91 L570 91" marker-end="url(#gf-a)"></path>
+    <text class="dg-l" x="546" y="83" text-anchor="middle">push</text>
+
+    <rect class="dg-box" x="574" y="62" width="118" height="58" rx="4"></rect>
+    <text class="dg-t" x="633" y="86" text-anchor="middle">GHCR</text>
+    <text class="dg-c" x="633" y="102" text-anchor="middle">ghcr.io/igfurlan</text>
+
+    <path class="dg-e" d="M692 91 L740 91" marker-end="url(#gf-a)"></path>
+
+    <rect class="dg-box" x="744" y="62" width="124" height="58" rx="4"></rect>
+    <text class="dg-t" x="806" y="86" text-anchor="middle">GitOps repo</text>
+    <text class="dg-c" x="806" y="102" text-anchor="middle">IMAGE TAG PATCHED</text>
+
+    <!-- CI hands over to the cluster -->
+    <path class="dg-e" d="M806 120 L806 168" marker-end="url(#gf-a)"></path>
+    <text class="dg-l" x="814" y="146">webhook / poll</text>
+
+    <!-- ── cluster ─────────────────────────────────────────────── -->
+    <rect class="dg-group" x="16" y="176" width="868" height="252" rx="6"></rect>
+    <text class="dg-c" x="30" y="196">KUBERNETES CLUSTER — musashi</text>
+
+    <rect class="dg-box-2" x="736" y="208" width="140" height="58" rx="4"></rect>
+    <text class="dg-t" x="806" y="232" text-anchor="middle">Argo CD</text>
+    <text class="dg-c" x="806" y="248" text-anchor="middle">DESIRED STATE = GIT</text>
+
+    <path class="dg-e" d="M736 237 L604 237" marker-end="url(#gf-a)"></path>
+    <text class="dg-l" x="670" y="229" text-anchor="middle">kubectl apply</text>
+
+    <rect class="dg-box-2" x="466" y="208" width="134" height="58" rx="4"></rect>
+    <text class="dg-t" x="533" y="232" text-anchor="middle">Argo Rollouts</text>
+    <text class="dg-c" x="533" y="248" text-anchor="middle">CANARY STRATEGY</text>
+
+    <path class="dg-e" d="M466 237 L346 237" marker-end="url(#gf-a)"></path>
+    <text class="dg-l" x="406" y="229" text-anchor="middle">canary split</text>
+
+    <rect class="dg-box" x="212" y="208" width="130" height="58" rx="4"></rect>
+    <text class="dg-t" x="277" y="232" text-anchor="middle">Backstage</text>
+    <text class="dg-c" x="277" y="248" text-anchor="middle">STABLE + CANARY PODS</text>
+
+    <path class="dg-e" d="M212 237 L152 237" marker-end="url(#gf-a)"></path>
+
+    <rect class="dg-box" x="32" y="208" width="116" height="58" rx="4"></rect>
+    <text class="dg-t" x="90" y="232" text-anchor="middle">Traefik</text>
+    <text class="dg-c" x="90" y="248" text-anchor="middle">HTTPROUTE</text>
+
+    <!-- analysis loop -->
+    <rect class="dg-box" x="466" y="322" width="134" height="58" rx="4"></rect>
+    <text class="dg-t" x="533" y="346" text-anchor="middle">Prometheus</text>
+    <text class="dg-c" x="533" y="362" text-anchor="middle">SCRAPES TRAEFIK METRICS</text>
+
+    <path class="dg-e-bg" d="M277 266 L277 351 L462 351" marker-end="url(#gf-b)"></path>
+    <text class="dg-l-bg" x="292" y="344">request rate · errors · latency</text>
+
+    <path class="dg-e" d="M533 322 L533 270" marker-end="url(#gf-a)"></path>
+    <text class="dg-l" x="542" y="300">PromQL analysis, every 30s</text>
+
+    <!-- outcomes -->
+    <rect class="dg-box" x="664" y="322" width="212" height="34" rx="3"></rect>
+    <text class="dg-t-s" x="678" y="344">Pass → promote to 100%</text>
+    <path class="dg-e" d="M600 339 L660 339" marker-end="url(#gf-a)"></path>
+
+    <rect class="dg-box" x="664" y="366" width="212" height="34" rx="3"></rect>
+    <text class="dg-t-s" x="678" y="388">Fail → abort, revert to stable</text>
+    <path class="dg-e-warn" d="M600 351 L630 351 L630 383 L660 383" marker-end="url(#gf-w)"></path>
+
+    <text class="dg-c" x="32" y="296">NO HUMAN IN THE DEPLOY PATH: THE ONLY MANUAL STEP IS MERGING THE PULL REQUEST</text>
+    <text class="dg-c" x="32" y="312">AND THE ONLY THING THAT PROMOTES A RELEASE IS A PROMETHEUS QUERY</text>
+  </svg>
+
+  <figcaption class="dg-cap-under">
+    Two repositories, deliberately: the application repository never talks to the cluster, and
+    the cluster only ever reads the GitOps repository. What promotes a release is a live
+    Prometheus query against the canary — error rate, p95 latency and restart count — not a
+    stopwatch and not a person watching a dashboard.
+  </figcaption>
+</figure>

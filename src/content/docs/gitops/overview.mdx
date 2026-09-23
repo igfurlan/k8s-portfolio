@@ -6,6 +6,7 @@ sidebar:
 ---
 
 import { Badge, Card, CardGrid, Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import GitOpsFlow from '../../../components/diagrams/GitOpsFlow.astro';
 
 
 GitOps is the operational model where Git is the single source of truth for both application and infrastructure state. Every change to a running system is made through a Git commit — never by running `kubectl apply` directly against the cluster. The cluster continuously reconciles its actual state against the desired state declared in Git.
@@ -228,7 +229,7 @@ The sealed data can only be decrypted by the cluster that holds the correspondin
 
 ## End-to-End Flow 
 
-![gitops flow diagram](/k8s-portfolio/images/gitops-diagram.png)
+<GitOpsFlow />
 
 
 <Aside type="tip">

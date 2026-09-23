@@ -1,0 +1,151 @@
+---
+/**
+ * Network and ingress path for the musashi single-node cluster.
+ *
+ * Redrawn from the earlier PNG. Two corrections carried in:
+ *   - the ACME challenge is DNS-01 over the Cloudflare API, not HTTP-01;
+ *     port 80 is not forwarded, which is the whole reason DNS-01 is used
+ *   - Harbor is gone, so the registry PVC and its HTTPRoute are not shown
+ */
+---
+
+<figure class="dg-wrap">
+  <svg class="dg" viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg" role="img"
+       aria-label="Traffic reaches the cluster through Cloudflare and a cloudflared tunnel to a NodePort, then Traefik routes it by HTTPRoute to Backstage, ArgoCD, Grafana, n8n and the Rollouts dashboard. cert-manager issues certificates over ACME DNS-01 through the Cloudflare API, and Cilium provides pod networking.">
+    <defs>
+      <marker id="nd-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head" points="0,0 8,4 0,8"></polygon>
+      </marker>
+      <marker id="nd-b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head-bg" points="0,0 8,4 0,8"></polygon>
+      </marker>
+    </defs>
+
+    <!-- ── outside ─────────────────────────────────────────────── -->
+    <text class="dg-c" x="18" y="22">INTERNET</text>
+
+    <rect class="dg-box" x="16" y="32" width="120" height="52" rx="4"></rect>
+    <text class="dg-t" x="76" y="56" text-anchor="middle">User</text>
+    <text class="dg-c" x="76" y="72" text-anchor="middle">BROWSER / API</text>
+
+    <path class="dg-e" d="M136 58 L186 58" marker-end="url(#nd-a)"></path>
+    <text class="dg-l" x="161" y="50" text-anchor="middle">https</text>
+
+    <rect class="dg-box" x="190" y="32" width="130" height="52" rx="4"></rect>
+    <text class="dg-t" x="255" y="56" text-anchor="middle">Cloudflare</text>
+    <text class="dg-c" x="255" y="72" text-anchor="middle">DNS + WAF</text>
+
+    <rect class="dg-box" x="376" y="32" width="150" height="52" rx="4"></rect>
+    <text class="dg-t" x="451" y="56" text-anchor="middle">Let's Encrypt</text>
+    <text class="dg-c" x="451" y="72" text-anchor="middle">ACME DNS-01</text>
+
+    <!-- DNS-01: cert-manager talks to the Cloudflare API, not to port 80 -->
+    <path class="dg-e-bg" d="M451 84 L451 120 L700 120 L700 250" marker-end="url(#nd-b)"></path>
+    <text class="dg-l-bg" x="560" y="114" text-anchor="middle">DNS-01 challenge via Cloudflare API</text>
+
+    <!-- ── host ────────────────────────────────────────────────── -->
+    <rect class="dg-group-2" x="16" y="104" width="304" height="104" rx="5"></rect>
+    <text class="dg-c" x="30" y="124">BARE-METAL HOST — musashi · 192.168.1.133 · FEDORA 43</text>
+
+    <path class="dg-e" d="M255 84 L255 134" marker-end="url(#nd-a)"></path>
+    <text class="dg-l" x="264" y="106">tunnel</text>
+
+    <rect class="dg-box" x="32" y="136" width="126" height="52" rx="4"></rect>
+    <text class="dg-t" x="95" y="160" text-anchor="middle">cloudflared</text>
+    <text class="dg-c" x="95" y="176" text-anchor="middle">OUTBOUND ONLY</text>
+
+    <path class="dg-e" d="M158 162 L186 162" marker-end="url(#nd-a)"></path>
+
+    <rect class="dg-box" x="190" y="136" width="114" height="52" rx="4"></rect>
+    <text class="dg-t" x="247" y="160" text-anchor="middle">NodePort</text>
+    <text class="dg-c" x="247" y="176" text-anchor="middle">:30443</text>
+
+    <!-- ── cluster ─────────────────────────────────────────────── -->
+    <rect class="dg-group" x="16" y="232" width="868" height="272" rx="6"></rect>
+    <text class="dg-c" x="30" y="252">KUBERNETES CLUSTER — SINGLE NODE, CILIUM eBPF DATAPLANE</text>
+
+    <path class="dg-e" d="M247 188 L247 214 L96 214 L96 268" marker-end="url(#nd-a)"></path>
+    <text class="dg-l" x="104" y="230">sni routing</text>
+
+    <rect class="dg-box-2" x="32" y="270" width="128" height="58" rx="4"></rect>
+    <text class="dg-t" x="96" y="294" text-anchor="middle">Traefik v3</text>
+    <text class="dg-c" x="96" y="310" text-anchor="middle">GATEWAY API</text>
+    <text class="dg-c" x="96" y="321" text-anchor="middle">ns: traefik</text>
+
+    <path class="dg-e" d="M160 298 L198 298" marker-end="url(#nd-a)"></path>
+
+    <!-- routes -->
+    <rect class="dg-group-2" x="202" y="262" width="450" height="74" rx="5"></rect>
+    <text class="dg-c" x="214" y="278">HTTPROUTES — parentRef: traefik-gateway</text>
+
+    <rect class="dg-box" x="212" y="286" width="96" height="40" rx="3"></rect>
+    <text class="dg-t-s" x="260" y="304" text-anchor="middle">backstage</text>
+    <text class="dg-c" x="260" y="318" text-anchor="middle">:7007</text>
+
+    <rect class="dg-box" x="316" y="286" width="82" height="40" rx="3"></rect>
+    <text class="dg-t-s" x="357" y="304" text-anchor="middle">argocd</text>
+    <text class="dg-c" x="357" y="318" text-anchor="middle">:443</text>
+
+    <rect class="dg-box" x="406" y="286" width="82" height="40" rx="3"></rect>
+    <text class="dg-t-s" x="447" y="304" text-anchor="middle">grafana</text>
+    <text class="dg-c" x="447" y="318" text-anchor="middle">:80</text>
+
+    <rect class="dg-box" x="496" y="286" width="70" height="40" rx="3"></rect>
+    <text class="dg-t-s" x="531" y="304" text-anchor="middle">n8n</text>
+    <text class="dg-c" x="531" y="318" text-anchor="middle">:5678</text>
+
+    <rect class="dg-box" x="574" y="286" width="70" height="40" rx="3"></rect>
+    <text class="dg-t-s" x="609" y="304" text-anchor="middle">rollouts</text>
+    <text class="dg-c" x="609" y="318" text-anchor="middle">DASHBOARD</text>
+
+    <!-- cert-manager -->
+    <rect class="dg-box-2" x="672" y="252" width="196" height="58" rx="4"></rect>
+    <text class="dg-t" x="770" y="276" text-anchor="middle">cert-manager</text>
+    <text class="dg-c" x="770" y="292" text-anchor="middle">CLUSTERISSUERS: letsencrypt-prod</text>
+    <text class="dg-c" x="770" y="303" text-anchor="middle">+ selfsigned</text>
+
+    <path class="dg-e-bg" d="M672 296 L656 296" marker-end="url(#nd-b)"></path>
+    <text class="dg-l-bg" x="664" y="326" text-anchor="end">issues TLS certificates</text>
+
+    <!-- storage -->
+    <rect class="dg-group-2" x="32" y="356" width="330" height="88" rx="5"></rect>
+    <text class="dg-c" x="44" y="374">STORAGE — local-path-provisioner (kube-system)</text>
+
+    <rect class="dg-box" x="44" y="384" width="96" height="46" rx="3"></rect>
+    <text class="dg-t-s" x="92" y="402" text-anchor="middle">postgres</text>
+    <text class="dg-c" x="92" y="416" text-anchor="middle">CLOUDNATIVEPG</text>
+
+    <rect class="dg-box" x="148" y="384" width="90" height="46" rx="3"></rect>
+    <text class="dg-t-s" x="193" y="402" text-anchor="middle">loki</text>
+    <text class="dg-c" x="193" y="416" text-anchor="middle">PVC</text>
+
+    <rect class="dg-box" x="246" y="384" width="104" height="46" rx="3"></rect>
+    <text class="dg-t-s" x="298" y="402" text-anchor="middle">n8n + backstage</text>
+    <text class="dg-c" x="298" y="416" text-anchor="middle">PVC</text>
+
+    <!-- sealed secrets -->
+    <rect class="dg-group-2" x="378" y="356" width="274" height="88" rx="5"></rect>
+    <text class="dg-c" x="390" y="374">SEALED SECRETS (kube-system)</text>
+    <text class="dg-l-bg" x="390" y="396">kubeseal → SealedSecret CR → Secret</text>
+    <text class="dg-c" x="390" y="414">PRIVATE KEY NEVER LEAVES THE CLUSTER;</text>
+    <text class="dg-c" x="390" y="428">CIPHERTEXT IS SAFE TO COMMIT</text>
+
+    <!-- cilium -->
+    <rect class="dg-group-2" x="668" y="356" width="200" height="88" rx="5"></rect>
+    <text class="dg-c" x="680" y="374">CILIUM — eBPF CNI</text>
+    <text class="dg-l-bg" x="680" y="396">kube-proxy replacement</text>
+    <text class="dg-l-bg" x="680" y="412">NetworkPolicy · VXLAN</text>
+    <text class="dg-l-bg" x="680" y="428">Hubble observability</text>
+
+    <!-- firewall note -->
+    <text class="dg-c" x="32" y="470">INBOUND FIREWALL: CLOUDFLARE IP RANGES AND LAN ONLY — NOTHING ELSE REACHES THE NODE</text>
+    <text class="dg-c" x="32" y="486">PORT 80 IS NEVER FORWARDED, WHICH IS WHY CERTIFICATE VALIDATION USES DNS-01</text>
+  </svg>
+
+  <figcaption class="dg-cap-under">
+    Nothing is exposed inbound. <code>cloudflared</code> holds an outbound tunnel to
+    Cloudflare, so the only way in is through it — and because port 80 never opens,
+    cert-manager validates certificates over DNS-01 against the Cloudflare API instead of
+    serving an HTTP challenge.
+  </figcaption>
+</figure>

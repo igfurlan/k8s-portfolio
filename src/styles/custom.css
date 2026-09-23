@@ -135,13 +135,13 @@ a.tech-badge:focus-visible {
    in CI. */
 .diagram-frame {
   width: 100%;
-  height: 1180px;
+  height: 880px;
   border: 1px solid var(--sl-color-hairline);
   border-radius: 8px;
   background: var(--sl-color-bg);
 }
 @media (max-width: 720px) {
-  .diagram-frame { height: 1320px; }
+  .diagram-frame { height: 1020px; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -240,3 +240,51 @@ a.tech-badge:focus-visible {
   .run { grid-template-columns: 1fr; gap: 0.2rem; }
   .swap { grid-template-columns: 1fr; gap: 0.3rem; }
 }
+
+/* ---------------------------------------------------------------------------
+   Diagrams.
+
+   Same visual language as the llm-d request-flow diagram: hairline boxes,
+   dashed teal group containers, solid teal for the path under discussion and
+   dashed grey for anything continuous or in the background.
+
+   Everything themes through Starlight's own tokens, so one set of drawings
+   works in light and dark without a second palette.
+   --------------------------------------------------------------------------- */
+
+.dg-wrap {
+  background: var(--sl-color-bg-sidebar);
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 8px;
+  padding: 1rem 0.9rem;
+  margin-block: 1.5rem;
+  overflow-x: auto;
+}
+.dg { display: block; width: 100%; height: auto; min-width: 620px; }
+.dg-cap-under {
+  margin: 0.7rem 0 0;
+  font-size: 0.82rem;
+  color: var(--sl-color-gray-3);
+  max-width: 62ch;
+}
+
+.dg-box    { fill: var(--sl-color-gray-6); stroke: var(--sl-color-gray-4); stroke-width: 1.2; }
+.dg-box-2  { fill: var(--sl-color-gray-5); stroke: var(--sl-color-gray-4); stroke-width: 1.2; }
+.dg-group  { fill: none; stroke: var(--sl-color-accent); stroke-width: 1.1; stroke-dasharray: 5 4; }
+.dg-group-2{ fill: none; stroke: var(--sl-color-gray-4); stroke-width: 1; stroke-dasharray: 4 4; }
+.dg-bar    { fill: var(--sl-color-accent); }
+
+.dg-e      { stroke: var(--sl-color-accent); stroke-width: 2; fill: none; }
+.dg-e-bg   { stroke: var(--sl-color-gray-3); stroke-width: 1.4; fill: none; stroke-dasharray: 4 4; }
+.dg-e-warn { stroke: var(--sl-color-red); stroke-width: 2; fill: none; }
+
+.dg-head      { fill: var(--sl-color-accent); }
+.dg-head-bg   { fill: var(--sl-color-gray-3); }
+.dg-head-warn { fill: var(--sl-color-red); }
+
+.dg-t   { fill: var(--sl-color-white); font-family: 'Archivo', system-ui, sans-serif; font-size: 13px; font-weight: 600; }
+.dg-t-s { fill: var(--sl-color-white); font-family: 'Archivo', system-ui, sans-serif; font-size: 11.5px; font-weight: 600; }
+.dg-c   { fill: var(--sl-color-gray-3); font-family: var(--sl-font-mono); font-size: 9px; letter-spacing: 0.06em; }
+.dg-l   { fill: var(--sl-color-accent); font-family: var(--sl-font-mono); font-size: 10px; }
+.dg-l-bg{ fill: var(--sl-color-gray-3); font-family: var(--sl-font-mono); font-size: 10px; }
+.dg-l-warn { fill: var(--sl-color-red); font-family: var(--sl-font-mono); font-size: 10px; }

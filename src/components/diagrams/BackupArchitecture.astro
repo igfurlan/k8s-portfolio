@@ -1,0 +1,102 @@
+---
+/**
+ * The four backup layers and what each one covers that the others do not.
+ * Replaces an ASCII drawing that only showed Velero, omitting the three layers
+ * that exist precisely because Velero alone is not enough.
+ */
+---
+
+<figure class="dg-wrap">
+  <svg class="dg" viewBox="0 0 900 450" xmlns="http://www.w3.org/2000/svg" role="img"
+       aria-label="Four backup layers: Velero with Kopia for Kubernetes resources and volumes, restic for raw PVC data, pg_dumpall for a logical PostgreSQL dump, and restic again for host configuration. All four land in OCI Object Storage, and each run reports to Pushgateway so Prometheus can alert on a backup that did not happen.">
+    <defs>
+      <marker id="bk-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head" points="0,0 8,4 0,8"></polygon>
+      </marker>
+      <marker id="bk-b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head-bg" points="0,0 8,4 0,8"></polygon>
+      </marker>
+    </defs>
+
+    <text class="dg-c" x="18" y="22">WHAT IS BEING PROTECTED</text>
+
+    <rect class="dg-box-2" x="16" y="32" width="200" height="52" rx="4"></rect>
+    <text class="dg-t-s" x="116" y="54" text-anchor="middle">Kubernetes objects</text>
+    <text class="dg-c" x="116" y="70" text-anchor="middle">DEPLOYMENTS · CRDS · SECRETS</text>
+
+    <rect class="dg-box-2" x="228" y="32" width="200" height="52" rx="4"></rect>
+    <text class="dg-t-s" x="328" y="54" text-anchor="middle">Volume data</text>
+    <text class="dg-c" x="328" y="70" text-anchor="middle">/opt/local-path-provisioner</text>
+
+    <rect class="dg-box-2" x="440" y="32" width="200" height="52" rx="4"></rect>
+    <text class="dg-t-s" x="540" y="54" text-anchor="middle">PostgreSQL</text>
+    <text class="dg-c" x="540" y="70" text-anchor="middle">CLOUDNATIVEPG CLUSTER</text>
+
+    <rect class="dg-box-2" x="652" y="32" width="232" height="52" rx="4"></rect>
+    <text class="dg-t-s" x="768" y="54" text-anchor="middle">The host itself</text>
+    <text class="dg-c" x="768" y="70" text-anchor="middle">/etc · /home/ifurlan</text>
+
+    <!-- layers -->
+    <path class="dg-e" d="M116 84 L116 130" marker-end="url(#bk-a)"></path>
+    <path class="dg-e" d="M328 84 L328 130" marker-end="url(#bk-a)"></path>
+    <path class="dg-e" d="M540 84 L540 130" marker-end="url(#bk-a)"></path>
+    <path class="dg-e" d="M768 84 L768 130" marker-end="url(#bk-a)"></path>
+
+    <text class="dg-c" x="18" y="152">FOUR LAYERS — EACH COVERS A GAP THE OTHERS LEAVE</text>
+
+    <rect class="dg-box" x="16" y="162" width="200" height="74" rx="4"></rect>
+    <text class="dg-t" x="116" y="186" text-anchor="middle">Velero + Kopia</text>
+    <text class="dg-c" x="116" y="204" text-anchor="middle">LAYER 1 · PER-NAMESPACE</text>
+    <text class="dg-c" x="116" y="218" text-anchor="middle">SCHEDULES, NODE-AGENT</text>
+    <text class="dg-c" x="116" y="230" text-anchor="middle">MOUNTS PVCS DIRECTLY</text>
+
+    <rect class="dg-box" x="228" y="162" width="200" height="74" rx="4"></rect>
+    <text class="dg-t" x="328" y="186" text-anchor="middle">restic</text>
+    <text class="dg-c" x="328" y="204" text-anchor="middle">LAYER 2 · RAW FILES</text>
+    <text class="dg-c" x="328" y="218" text-anchor="middle">RESTORABLE WITHOUT</text>
+    <text class="dg-c" x="328" y="230" text-anchor="middle">A WORKING CLUSTER</text>
+
+    <rect class="dg-box" x="440" y="162" width="200" height="74" rx="4"></rect>
+    <text class="dg-t" x="540" y="186" text-anchor="middle">pg_dumpall</text>
+    <text class="dg-c" x="540" y="204" text-anchor="middle">LAYER 3 · LOGICAL</text>
+    <text class="dg-c" x="540" y="218" text-anchor="middle">SURVIVES A CORRUPT</text>
+    <text class="dg-c" x="540" y="230" text-anchor="middle">DATA DIRECTORY</text>
+
+    <rect class="dg-box" x="652" y="162" width="232" height="74" rx="4"></rect>
+    <text class="dg-t" x="768" y="186" text-anchor="middle">restic (host)</text>
+    <text class="dg-c" x="768" y="204" text-anchor="middle">LAYER 4 · CONFIGURATION</text>
+    <text class="dg-c" x="768" y="218" text-anchor="middle">REBUILDS THE MACHINE,</text>
+    <text class="dg-c" x="768" y="230" text-anchor="middle">NOT JUST THE CLUSTER</text>
+
+    <!-- layer 3 feeds layer 2 -->
+    <path class="dg-e-bg" d="M540 236 L540 258 L328 258 L328 240" marker-end="url(#bk-b)"></path>
+    <text class="dg-l-bg" x="434" y="274" text-anchor="middle">the dump is written to disk, then swept up by layer 2</text>
+
+    <!-- destination -->
+    <path class="dg-e" d="M116 236 L116 300 L380 300 L380 322" marker-end="url(#bk-a)"></path>
+    <path class="dg-e" d="M768 236 L768 300 L520 300 L520 322" marker-end="url(#bk-a)"></path>
+
+    <rect class="dg-box-2" x="330" y="324" width="240" height="60" rx="4"></rect>
+    <text class="dg-t" x="450" y="348" text-anchor="middle">OCI Object Storage</text>
+    <text class="dg-c" x="450" y="364" text-anchor="middle">OFF-SITE · S3-COMPATIBLE</text>
+    <text class="dg-c" x="450" y="376" text-anchor="middle">SÃO PAULO REGION</text>
+
+    <!-- monitoring -->
+    <path class="dg-e-bg" d="M570 354 L680 354" marker-end="url(#bk-b)"></path>
+    <rect class="dg-box" x="684" y="324" width="200" height="60" rx="4"></rect>
+    <text class="dg-t" x="784" y="348" text-anchor="middle">Pushgateway</text>
+    <text class="dg-c" x="784" y="364" text-anchor="middle">→ PROMETHEUS → GRAFANA</text>
+    <text class="dg-c" x="784" y="376" text-anchor="middle">ALERTS ON A MISSING RUN</text>
+
+    <text class="dg-c" x="16" y="412">EVERY RUN REPORTS ITS OWN RESULT. A BACKUP THAT SILENTLY STOPS RUNNING IS THE</text>
+    <text class="dg-c" x="16" y="428">FAILURE MODE THAT MATTERS, AND IT LOOKS EXACTLY LIKE SUCCESS UNTIL A RESTORE.</text>
+  </svg>
+
+  <figcaption class="dg-cap-under">
+    A single approach fails in predictable ways: a Velero snapshot does not help if the host
+    OS is gone, and a file copy does not capture the resource definitions needed to reassemble
+    the cluster. Each layer exists to cover what the one beside it cannot — and every run
+    pushes a metric, because the backup that quietly stopped running looks identical to the
+    one that worked.
+  </figcaption>
+</figure>

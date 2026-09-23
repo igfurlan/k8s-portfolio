@@ -6,6 +6,7 @@ sidebar:
 ---
 
 import { Badge, Card, CardGrid, Aside } from '@astrojs/starlight/components';
+import NetworkDiagram from '../../../components/diagrams/NetworkDiagram.astro';
 
 
 This homelab runs a single-node, production-grade Kubernetes cluster on bare metal. The goal is to mirror real-world platform engineering practices — GitOps, observability, automated deployments, and secure secret management — in a resource-constrained environment.
@@ -122,7 +123,7 @@ Active certificates:
 
 ## Conceptual Architecture Diagram
 
-![network visual diagram](/k8s-portfolio/images/network-diagram.png)
+<NetworkDiagram />
 
 
 ## All Running Workloads

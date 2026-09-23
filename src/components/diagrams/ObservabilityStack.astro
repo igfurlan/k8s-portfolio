@@ -1,0 +1,103 @@
+---
+/**
+ * The observability stack, as layers: what collects, what stores, what asks.
+ * Replaces an ASCII box drawing whose right-hand border drifted out of line
+ * at any width where the monospace assumption did not hold.
+ */
+---
+
+<figure class="dg-wrap">
+  <svg class="dg" viewBox="0 0 900 430" xmlns="http://www.w3.org/2000/svg" role="img"
+       aria-label="Collectors — Grafana Alloy, Node Exporter, kube-state-metrics, Blackbox Exporter and Pushgateway — feed Prometheus and Loki. Grafana queries both, and AlertManager routes alerts to Telegram and Gmail.">
+    <defs>
+      <marker id="ob-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head" points="0,0 8,4 0,8"></polygon>
+      </marker>
+      <marker id="ob-b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head-bg" points="0,0 8,4 0,8"></polygon>
+      </marker>
+    </defs>
+
+    <!-- ── collectors ──────────────────────────────────────────── -->
+    <text class="dg-c" x="18" y="22">COLLECTORS — WHAT GATHERS THE DATA</text>
+
+    <rect class="dg-box" x="16" y="32" width="160" height="64" rx="4"></rect>
+    <text class="dg-t" x="96" y="56" text-anchor="middle">Grafana Alloy</text>
+    <text class="dg-c" x="96" y="72" text-anchor="middle">DAEMONSET</text>
+    <text class="dg-c" x="96" y="85" text-anchor="middle">POD LOGS + JOURNAL</text>
+
+    <rect class="dg-box" x="188" y="32" width="150" height="64" rx="4"></rect>
+    <text class="dg-t" x="263" y="56" text-anchor="middle">Node Exporter</text>
+    <text class="dg-c" x="263" y="72" text-anchor="middle">CPU · MEMORY · DISK</text>
+    <text class="dg-c" x="263" y="85" text-anchor="middle">SYSTEMD UNITS</text>
+
+    <rect class="dg-box" x="350" y="32" width="160" height="64" rx="4"></rect>
+    <text class="dg-t" x="430" y="56" text-anchor="middle">kube-state-metrics</text>
+    <text class="dg-c" x="430" y="72" text-anchor="middle">OBJECT STATE</text>
+    <text class="dg-c" x="430" y="85" text-anchor="middle">DEPLOYMENTS · PODS · PVCS</text>
+
+    <rect class="dg-box" x="522" y="32" width="150" height="64" rx="4"></rect>
+    <text class="dg-t" x="597" y="56" text-anchor="middle">Blackbox</text>
+    <text class="dg-c" x="597" y="72" text-anchor="middle">SYNTHETIC HTTP PROBES</text>
+    <text class="dg-c" x="597" y="85" text-anchor="middle">FROM OUTSIDE IN</text>
+
+    <rect class="dg-box" x="684" y="32" width="150" height="64" rx="4"></rect>
+    <text class="dg-t" x="759" y="56" text-anchor="middle">Pushgateway</text>
+    <text class="dg-c" x="759" y="72" text-anchor="middle">BATCH JOBS</text>
+    <text class="dg-c" x="759" y="85" text-anchor="middle">BACKUPS · BUCKET USAGE</text>
+
+    <!-- collectors → stores -->
+    <path class="dg-e" d="M263 96 L263 150" marker-end="url(#ob-a)"></path>
+    <path class="dg-e" d="M430 96 L430 150" marker-end="url(#ob-a)"></path>
+    <path class="dg-e" d="M597 96 L597 150" marker-end="url(#ob-a)"></path>
+    <path class="dg-e" d="M759 96 L759 122 L640 122 L640 150" marker-end="url(#ob-a)"></path>
+    <path class="dg-e" d="M96 96 L96 150" marker-end="url(#ob-a)"></path>
+
+    <text class="dg-l" x="104" y="118">logs</text>
+    <text class="dg-l" x="438" y="118">metrics, scraped every 30s</text>
+
+    <!-- ── stores ──────────────────────────────────────────────── -->
+    <text class="dg-c" x="18" y="172">STORES — WHERE IT LANDS</text>
+
+    <rect class="dg-box-2" x="16" y="182" width="160" height="62" rx="4"></rect>
+    <text class="dg-t" x="96" y="208" text-anchor="middle">Loki</text>
+    <text class="dg-c" x="96" y="224" text-anchor="middle">LOGS · LABEL-INDEXED</text>
+    <text class="dg-c" x="96" y="236" text-anchor="middle">31d RETENTION</text>
+
+    <rect class="dg-box-2" x="188" y="182" width="646" height="62" rx="4"></rect>
+    <text class="dg-t" x="511" y="208" text-anchor="middle">Prometheus</text>
+    <text class="dg-c" x="511" y="224" text-anchor="middle">TIME SERIES · SERVICEMONITOR AND PODMONITOR DISCOVERY</text>
+    <text class="dg-c" x="511" y="236" text-anchor="middle">RECORDING RULES · ALERT RULES</text>
+
+    <!-- stores → consumers -->
+    <path class="dg-e" d="M96 244 L96 300" marker-end="url(#ob-a)"></path>
+    <path class="dg-e" d="M340 244 L340 300" marker-end="url(#ob-a)"></path>
+    <text class="dg-l" x="348" y="272">LogQL + PromQL</text>
+
+    <path class="dg-e" d="M700 244 L700 300" marker-end="url(#ob-a)"></path>
+    <text class="dg-l" x="708" y="272">rules fire</text>
+
+    <!-- ── consumers ───────────────────────────────────────────── -->
+    <text class="dg-c" x="18" y="322">CONSUMERS — WHO ASKS, AND WHO GETS TOLD</text>
+
+    <rect class="dg-box" x="16" y="332" width="480" height="70" rx="4"></rect>
+    <text class="dg-t" x="256" y="358" text-anchor="middle">Grafana</text>
+    <text class="dg-c" x="256" y="374" text-anchor="middle">grafana.kubefurlan.com</text>
+    <text class="dg-c" x="256" y="390" text-anchor="middle">DASHBOARDS · EXPLORE · AD-HOC QUERIES</text>
+
+    <rect class="dg-box" x="522" y="332" width="312" height="70" rx="4"></rect>
+    <text class="dg-t" x="678" y="358" text-anchor="middle">AlertManager</text>
+    <text class="dg-c" x="678" y="374" text-anchor="middle">GROUPING · INHIBITION · SILENCES</text>
+    <text class="dg-c" x="678" y="390" text-anchor="middle">→ TELEGRAM BOT · → GMAIL</text>
+
+    <!-- rollouts tie-in -->
+    <path class="dg-e-bg" d="M834 213 L866 213 L866 420 L500 420" marker-end="url(#ob-b)"></path>
+    <text class="dg-l-bg" x="508" y="416">Argo Rollouts queries the same Prometheus to gate a canary</text>
+  </svg>
+
+  <figcaption class="dg-cap-under">
+    Three layers, and the direction matters: collectors never talk to Grafana, and Grafana
+    never talks to a workload. Everything meets in Prometheus and Loki — which is also why
+    Argo Rollouts can gate a deployment on exactly the data an operator would look at.
+  </figcaption>
+</figure>
