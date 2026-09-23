@@ -1,0 +1,142 @@
+---
+title: The Experiment
+description: An A/B test of prefix-aware routing against round-robin on the same pods — including the first run that measured nothing, and the three conditions that were missing.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The dashboard showed a prefix cache hit ratio around 33%. Nothing on it established that
+**llm-d caused that**. This is the experiment that does.
+
+## The claim under test
+
+> Routing that understands the payload — which pod holds this prompt's prefix, how deep each
+> queue is — serves the same traffic better than round-robin.
+
+Plausible, widely asserted, and worth measuring on your own cluster before repeating.
+
+## Design
+
+| Arm | Path | Routing |
+|---|---|---|
+| **A** | `/v1/chat/completions` | Gateway → endpoint picker → InferencePool. Prefix-aware, with prefill/decode disaggregation |
+| **B** | `/rr/v1/chat/completions` | Gateway → plain `Service` → kube-proxy round-robin |
+
+**The same six model servers serve both arms.** Separate replicas would compare two sets of
+caches on two sets of hardware, and any result could be waved away as placement luck. Same
+pods, caches cleared between runs, one variable.
+
+The workload is the other half of the design: a ~250-token system prompt shared by every
+request, a ~200-token **distinct** per-user persona, and a short varying question — six users,
+forty turns each. That is the shape of real LLM traffic, and the shape where cache locality is
+worth something. Unique random prompts would show nothing (nothing to cache); one identical
+prompt would show everything and prove nothing.
+
+---
+
+## Run 1 — the one that found nothing
+
+| | Prefix-aware | Round-robin |
+|---|---|---|
+| Hit ratio | 74.7% | 74.2% |
+| Latency p50 | 12.2 ms | 5.3 ms |
+
+**0.5 points is noise.** And the reason is arithmetic rather than scheduling.
+
+Each prompt was ~259 tokens. At a 64-token block size the shared system prompt occupies
+exactly three full blocks — 192 tokens — and
+
+```
+192 / 259 = 74.1%
+```
+
+which is both arms' measured hit ratio to within rounding. **Every hit came from the prefix
+all requests share**, which both pods cache within two requests, and nothing else hit at all.
+
+Three conditions the mechanism needs were absent:
+
+1. **The distinguishing prefix was sub-block.** Each user's persona was ~40 tokens. Below 64,
+   per-user context is invisible to a block-granular cache no matter where it is routed.
+2. **Nothing ever evicted.** `kv-cache-size 1024` blocks is 65,536 tokens — the entire working
+   set fitted on every pod simultaneously, so scattering cost nothing. **Locality only pays
+   when memory is scarce, and the benchmark had removed scarcity by accident.**
+3. **One candidate per role.** With a single prefill pod and a single decode pod, the picker
+   logged `num-of-candidates: 1`. There was no routing decision to make — both arms were the
+   same thing pointed at the same pod.
+
+<Aside type="tip" title="The measurement was broken too">
+The first attempt asked Prometheus for the hit ratio right after each arm, and got the
+**identical value to sixteen decimal places** both times. Not a coincidence: a 240-request run
+finishes in about a second, the scrape interval is 15 s, and `increase(...[10m])` spans both
+arms. The query was correct and answered a question nobody asked.
+
+The fix was to read the counters straight off the model servers before and after each run —
+exact, independent of scrape timing, and it surfaces the per-pod distribution, which is what
+actually separates the arms.
+</Aside>
+
+---
+
+## Run 2 — three fixes, and the gap appears
+
+Per-user personas 40 → **200 tokens**. Cache per server 65,536 → **1,024 tokens**. Replicas
+1 → **3 per role**.
+
+| | Prefix-aware | Round-robin |
+|---|---|---|
+| **Hit ratio** | **82.6%** | 78.4% |
+| Prompt tokens queried | 177,832 | 88,916 |
+| Cache hits | 146,816 | 69,696 |
+| Latency p50 | 13.4 ms | **5.4 ms** |
+| Latency p90 | 16.2 ms | 6.8 ms |
+
+### Against the ceiling, which is the honest denominator
+
+Prompts average 370 tokens. At 64-token blocks only five complete blocks — 320 tokens — can
+ever be cached; the trailing 50 are recomputed by everyone, every time.
+
+```
+ceiling = 320 / 370 = 86.4%
+```
+
+| | Hit ratio | Share of the achievable | Prompt tokens recomputed |
+|---|---|---|---|
+| Prefix-aware | 82.6% | **95.6%** | 17.4% |
+| Round-robin | 78.4% | 90.7% | 21.6% |
+
+So prefix-aware routing recovers about **a quarter of the recomputation** round-robin leaves
+on the table. A 4-point headline understates it; against the reachable maximum it is the
+difference between capturing 91% and 96% of the available caching.
+
+### Even distribution is not the goal
+
+Arm A concentrated unevenly on purpose — 15,006 to 44,458 tokens across three prefill pods —
+because it routes by prefix, and prefixes are not evenly sized. Arm B spread more evenly and
+got a worse hit ratio for it. That contrast is the whole argument in one line.
+
+### The cost is real and stated
+
+Arm A stayed ~2.5× slower per request, and touched prompt tokens twice (177,832 ≈ 2 × 88,916)
+because P/D sends the prompt to prefill and decode looks it up as well.
+
+Against a simulator that returns in microseconds, a scheduling round trip and a second backend
+call buy nothing back. **On a GPU, recomputing 64 prompt tokens costs far more than 8 ms of
+routing** — which is the regime where this trade pays, and precisely the one this hardware
+cannot reproduce. The hit-ratio finding transfers between environments; the latency number is
+a property of this lab and should not be quoted without it.
+
+---
+
+## What I'd take from it
+
+**Cache-aware routing pays when the distinguishing prefix is long enough to form whole blocks,
+and when the aggregate working set exceeds what one pod can hold.** When neither holds,
+round-robin matches it exactly — and wins on latency, because it does not pay for a scheduling
+round trip.
+
+That is a narrower claim than the one I set out to test, and a more useful one. It also means
+the honest question to ask about any inference platform is not "does it do cache-aware
+routing" but "does my traffic have the shape that makes cache-aware routing worth its cost".
+
+The load generator, the protocol and both runs' raw output are in the repository:
+**[github.com/igfurlan/k3s-llmd-lab](https://github.com/igfurlan/k3s-llmd-lab)**

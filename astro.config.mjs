@@ -8,46 +8,42 @@ export default defineConfig({
 	base: '/k8s-portfolio',
 	integrations: [
 		starlight({
-			title: 'Kubernetes Homelab',
-			description: 'A production-grade Kubernetes homelab running on a single node — showcasing GitOps, observability, security, and cloud-native patterns.',
+			title: 'Igor Furlan',
+			description:
+				'Platform engineering, measured rather than asserted. Two labs: a production-pattern Kubernetes homelab, and a distributed AI inference cluster running llm-d.',
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/igfurlan' },
 			],
+			// Grouped by LAB, not by topic. Each lab is a different machine, a
+			// different problem and a different set of decisions — flattening them
+			// into shared topic groups would blur exactly what distinguishes them.
 			sidebar: [
 				{
-					label: 'Overview',
+					label: 'Start here',
 					items: [
-						{ label: 'Home', slug: 'index' },
+						{ label: 'Overview', slug: 'index' },
 					],
 				},
 				{
-					label: '🖥️ Cluster',
+					label: 'Kubernetes Homelab',
+					collapsed: false,
 					items: [
-						{ label: 'Architecture Overview', slug: 'cluster/architecture' },
-					],
-				},
-				{
-					label: '🔄 GitOps',
-					items: [
-						{ label: 'GitOps with ArgoCD & Argo Rollouts', slug: 'gitops/overview' },
-					],
-				},
-				{
-					label: '📊 Observability',
-					items: [
+						{ label: 'Cluster Architecture', slug: 'cluster/architecture' },
+						{ label: 'GitOps & Progressive Delivery', slug: 'gitops/overview' },
 						{ label: 'Observability Stack', slug: 'observability/stack' },
-					],
-				},
-				{
-					label: '🔒 Security',
-					items: [
 						{ label: 'Cluster Security', slug: 'security/overview' },
+						{ label: 'Backup & Recovery', slug: 'backup/strategy' },
 					],
 				},
 				{
-					label: '💾 Backup',
+					label: 'AI Inference Lab',
+					collapsed: false,
 					items: [
-						{ label: 'Backup Strategy & Monitoring', slug: 'backup/strategy' },
+						{ label: 'Overview & Findings', slug: 'ai-lab/overview' },
+						{ label: 'Architecture', slug: 'ai-lab/architecture' },
+						{ label: 'How Routing Works', slug: 'ai-lab/routing' },
+						{ label: 'The Experiment', slug: 'ai-lab/experiment' },
+						{ label: 'Observability', slug: 'ai-lab/observability' },
 					],
 				},
 			],

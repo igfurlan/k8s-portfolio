@@ -84,9 +84,26 @@ kube-system   sealed-secrets-controller-869f4b696b   1/1 Running   27h
 The sealed-secrets-controller's private key is the crown jewel. It's automatically backed up as part of the Velero cluster backup. Without it, sealed secrets in Git cannot be decrypted and credentials would need to be regenerated.
 </Aside>
 
-## Harbor — Private Container Registry
+## Harbor — Private Container Registry <Badge text="Retired" variant="caution" />
 
-**Harbor** is the private container registry running in the `harbor` namespace. All custom container images built in CI are pushed to **GHCR** (GitHub Container Registry), but Harbor serves as the internal registry for any air-gapped image mirroring and provides the full image lifecycle management features that GHCR does not.
+<Aside type="caution" title="No longer running">
+Harbor was removed from the cluster after this was written. It is kept here because the work
+and the screenshots are real, and because the reason for removing it is part of the story:
+**it earned its footprint in features I was not using.**
+
+Eight pods — core, registry, nginx, portal, jobservice, PostgreSQL, Redis and Trivy — on a
+single 16 GB node, to mirror images that CI was already pushing to GHCR. Replication and
+lifecycle policies are genuinely useful at scale; on one machine with one pipeline they were
+capacity spent on capability I did not need. Trivy scanning moved into the CI pipeline, where
+it catches problems before an image is ever pushed.
+
+Everything below describes the cluster as it ran at the time.
+</Aside>
+
+**Harbor** was the private container registry running in the `harbor` namespace. All custom
+container images built in CI are pushed to **GHCR** (GitHub Container Registry); Harbor served
+as the internal registry for air-gapped image mirroring and provided the image lifecycle
+management features that GHCR does not.
 
 ### Harbor Components
 
@@ -148,7 +165,7 @@ Used for internal services and as a bootstrap issuer for cert-manager's own webh
 
 | Certificate | Namespace | Issuer | Status |
 |---|---|---|---|
-| `harbor-tls` | harbor | letsencrypt-prod | Ready |
+| `harbor-tls` | harbor | letsencrypt-prod | Ready *(since retired)* |
 | `traefik-gateway-cert` | traefik | selfsigned-issuer | Ready |
 | `traefik-letsencrypt-cert` | traefik | letsencrypt-prod | Ready |
 

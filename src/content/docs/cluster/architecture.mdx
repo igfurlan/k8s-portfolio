@@ -114,7 +114,7 @@ Active certificates:
 
 | Certificate | Namespace | Status |
 |---|---|---|
-| `harbor-tls` | harbor | Ready |
+| `harbor-tls` | harbor | Ready *(at time of capture; Harbor since retired)* |
 | `traefik-gateway-cert` | traefik | Ready |
 | `traefik-letsencrypt-cert` | traefik | Ready |
 
@@ -156,7 +156,7 @@ Grouped by function:
 |---|---|---|
 | `cert-manager` | cert-manager, cainjector, webhook | TLS certificate automation |
 | `kube-system` | sealed-secrets-controller | Encrypted Kubernetes secrets |
-| `harbor` | harbor-core, registry, trivy, jobservice, portal | Private container registry + vulnerability scanning |
+| `harbor` | harbor-core, registry, trivy, jobservice, portal | Private container registry + vulnerability scanning — **since retired**, see [Cluster Security](/k8s-portfolio/security/overview/#harbor--private-container-registry) |
 | `kube-system` | cilium (DaemonSet), cilium-operator | Pod networking (CNI) and NetworkPolicy enforcement |
 
 ### Data Platform

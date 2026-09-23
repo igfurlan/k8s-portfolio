@@ -1,0 +1,122 @@
+---
+title: AI Lab Observability
+description: Prometheus scraping model servers and the scheduler, an authenticated metrics endpoint that returned an empty 200, and a dashboard where every panel is tied to a decision rather than a metric.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`kube-prometheus-stack`, trimmed to fit three 6 GB nodes: no Alertmanager, 24-hour retention,
+Grafana on a NodePort because agentgateway already owns `:80` on those nodes.
+
+The dashboard JSON lives in git and provisions from a ConfigMap, so **Grafana deliberately has
+no persistence** — a restart costs nothing and the UI is never the only copy.
+
+## What gets scraped, and how
+
+| Target | Monitor | Notes |
+|---|---|---|
+| Model servers | `PodMonitor` | Not a `ServiceMonitor` — the simulators have **no Service**. The InferencePool selects their pods directly, which is the point of the inference extension |
+| Endpoint picker | `ServiceMonitor` | Authenticated — see below |
+| ollama | *(none)* | It exposes no Prometheus endpoint at all. It appears only through cAdvisor's container CPU and memory |
+
+The `PodMonitor` copies each pod's `llm-d.ai/role` label onto every series via
+`podTargetLabels`. Without that, prefill and decode are two anonymous pods and none of the
+by-role panels are possible.
+
+<Aside type="caution" title="Three k3s scrape jobs are disabled on purpose">
+`kubeControllerManager`, `kubeScheduler`, `kubeEtcd` and `kubeProxy` assume a kubeadm-style
+control plane with components on their own ports. k3s runs them inside one process, so those
+targets sit permanently red. They are turned off deliberately — **a dashboard full of false
+failures teaches people to ignore failures.**
+</Aside>
+
+---
+
+## An endpoint that answered 200 with nothing
+
+The endpoint picker guards `/metrics` behind `--metrics-endpoint-auth`, which defaults to on.
+An unauthenticated scrape gets an **empty 200 body**, not a 401 — which reads exactly like a
+component that exports nothing, and was filed as an open item for a day.
+
+The fix was *not* to turn authentication off. Prometheus got a ServiceAccount, a ClusterRole
+granting `get` on the **non-resource URL** `/metrics`, and a bearer token:
+
+```yaml
+rules:
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+```
+
+Then the token was rejected too — and the reason is worth knowing, because it inverts where
+you look. Controller-runtime does not validate bearer tokens itself: it calls `TokenReview`
+and then `SubjectAccessReview` against the API server, **using the component's own
+ServiceAccount**. The chart enables metrics auth without granting the picker those rights:
+
+```
+tokenreviews.authentication.k8s.io is forbidden: User
+"system:serviceaccount:llm-d:sim-pool-epp" cannot create resource "tokenreviews"
+```
+
+So every authenticated request failed identically, whoever made it and whatever token they
+held. **The credential was never the problem — the checker was.** Binding the built-in
+`system:auth-delegator` ClusterRole to the picker's ServiceAccount fixed it.
+
+Two smaller ones from the same afternoon: the operator resolves scrape credentials in the
+**ServiceMonitor's own namespace**, not Prometheus's; and a `ServiceMonitor` whose selector or
+port name is wrong exists, validates, and scrapes nothing — the same silent failure shape as
+the auth problem it sat next to.
+
+---
+
+## The dashboard
+
+Fourteen panels, written against the metric inventory read off Prometheus rather than from the
+project's catalogue — which lists far more than any one configuration populates.
+
+| Row | Answers |
+|---|---|
+| Headline | Is traffic flowing, and is caching working? |
+| Routing | What is the picker deciding, and what does deciding cost? |
+| Cache | Where are the cached prefixes, and which pod is filling up? |
+| Throughput | Is prefill work landing on prefill and decode work on decode? |
+| Latency | What does a caller feel, and which plugin is expensive? |
+| Real vs simulated | A real model burning CPU beside simulators that do not |
+
+The find worth having was `llm_d_epp_disagg_decision_total` — **the picker counts its own
+prefill/decode decisions**, which turns the split we proved by hand into a time series.
+
+Every `vllm:*` query works unchanged against real vLLM, because the simulator emits vLLM's
+metric names. That compatibility is what makes a GPU-free lab worth building.
+
+---
+
+## Panels as decisions, not metrics
+
+A dashboard that only says the system is alive is wallpaper. Each panel here exists because it
+changes what you would do:
+
+| What you see | What it means | What to do |
+|---|---|---|
+| Hit ratio **collapses when you add replicas** | More pods, same prompts, each cache colder | Scale in, or raise the cache-affinity weight. More replicas is **not free** for cache-bound workloads |
+| One pod near full KV cache, a sibling idle | Cache affinity is outvoting load — a *routing* fault | Raise `kv-cache-utilization-scorer`. Adding pods will not fix a distribution fault |
+| `waiting` above zero on **all** pods of a role | That phase is genuinely saturated | Scale **that role only** — the whole point of disaggregating |
+| TTFT rising **with** the split rate | The KV transfer costs more than the prefill it avoids | Raise `nonCachedTokens`. Disaggregation is not always right |
+| Queue depth up, **CPU flat** | The pods are not working, they are waiting | Suspect the hypervisor before the application |
+| `ready_endpoints` drops to zero | `FailOpen` keeps requests flowing, round-robin and cache-blind | **Urgent.** The system looks fine and every routing decision has stopped happening |
+
+That last row is the one to internalise: **FailOpen converts an outage into a silent quality
+regression.** Only that panel and the hit ratio reveal it.
+
+The full mapping — every panel, every threshold, and the cross-panel diagnoses that actually
+discriminate — is in
+[reading-the-dashboard.md](https://github.com/igfurlan/k3s-llmd-lab/blob/main/docs/reading-the-dashboard.md).
+
+---
+
+## What it cannot tell you
+
+- **Answer quality.** Nothing here knows whether the model said anything useful.
+- **Whether the cache hits were worth having.** A hit on a prefix nobody reuses is a
+  coincidence, not a design.
+- **Cost.** No dollars, no GPU hours — the column that decides whether any of this pays for
+  itself on real hardware.

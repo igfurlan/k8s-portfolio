@@ -1,0 +1,165 @@
+---
+title: How Routing Works
+description: The llm-d endpoint picker — ext_proc, two scheduling profiles with opposite priorities, weighted scorers, and the arithmetic that decides whether a request is split across two machines.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A Kubernetes `Service` load-balances blind: round-robin across healthy pods, with no view of
+the request body and no view of what any backend holds in memory. For LLM traffic that is not
+merely suboptimal — it is wrong in three specific ways:
+
+1. **Prefix cache locality.** Two requests sharing a prompt prefix should hit the *same* pod,
+   whose cache is already warm. Round-robin scatters them and every request pays full cost.
+2. **Queue depth.** Requests are long-lived. A pod with twenty queued requests should not
+   receive a twenty-first while a sibling idles.
+3. **Adapter locality.** A pod with the right LoRA adapter loaded should be preferred over one
+   that has to load it first.
+
+The **endpoint picker** (EPP) knows all three, because it reads the model servers' own
+metrics.
+
+## ext_proc — how a gateway asks a question mid-request
+
+**External Processing** is an Envoy filter that lets a proxy hand a request to an outside gRPC
+service *while it is in flight* and act on the answer. agentgateway implements the same API.
+
+```
+client ──▶ gateway :80
+             └─▶ gRPC stream to the EPP, carrying headers AND body
+                   └─▶ EPP scores every pod in the InferencePool
+                         └─▶ answers with a header naming the endpoint
+             ──▶ gateway forwards there
+```
+
+The body matters. A normal load balancer never reads it — but the prompt *is* the routing
+signal, so an inference gateway has to.
+
+Two consequences worth holding on to:
+
+- It is **synchronous and in the request path**. Every request waits on the EPP, which is why
+  it gets its own CPU request rather than scavenging.
+- `failureMode: FailOpen` means that if the EPP is unreachable, the gateway falls back to
+  ordinary load balancing instead of failing requests. **Degraded routing, not an outage** —
+  and a silent one: a working cluster and a well-scheduled cluster look identical from `curl`.
+
+---
+
+## Profiles: two sets of priorities, one cluster
+
+The EPP organises scheduling into **profiles**. A profile is a named set of *filters* (which
+pods are eligible), *scorers* (how to rank them) and a *picker* (how to turn scores into a
+choice). This lab runs two:
+
+| Profile | Weights | The reasoning |
+|---|---|---|
+| **prefill** | `prefix-cache ×3`, `queue ×1` | A pod that already holds this prefix skips the expensive pass entirely. Cache locality is worth more than an even queue — 3:1 |
+| **decode** | `prefix-cache ×3`, `queue ×2`, `kv-cache-utilisation ×2` | Decode work is long-lived and bandwidth-bound; free capacity matters as much as locality |
+
+**Those weights are the policy.** Not the plugin list, not the CRDs — six integers that state
+what this cluster believes is worth optimising. Changing them changes the system's whole
+character, and they are the first thing to experiment with.
+
+<Aside type="tip" title="Why the decode profile gained a cache scorer">
+The chart's default decode profile is cache-blind, which is defensible when every split sends
+the prompt off to a prefill pod. But a request the decider *declines* to split is prefilled
+locally by decode — so locality matters on that side too. Leaving it out made half the traffic
+unroutable on the very dimension the experiment was testing.
+</Aside>
+
+---
+
+## Prefill and decode are opposite problems
+
+Inference has two phases with contradictory performance profiles:
+
+- **Prefill** processes the entire prompt in one parallel pass and produces the KV cache. It
+  is **compute-bound**.
+- **Decode** emits output tokens one at a time, re-reading that cache. It is
+  **memory-bandwidth-bound**.
+
+Sized together in one pod, you size correctly for neither. Split, each scales and is placed
+independently — on real hardware, prefill on high-FLOPs accelerators and decode on
+high-bandwidth ones. Here they are pinned to different nodes by label, which makes the
+architecture visible in `kubectl get pods -o wide`.
+
+### The decider, and its arithmetic
+
+Splitting is not free: the KV cache has to move from the prefill pod to the decode pod — over
+NIXL in production, modelled here. So a `disagg-profile-handler` asks a **decider** whether
+each request is worth splitting, and `prefix-based-pd-decider` answers with:
+
+```go
+hitPrefixTokens = cachedBlockCount × blockSizeTokens
+nonCachedTokens = inputTokens − hitPrefixTokens
+split           = nonCachedTokens >= threshold
+```
+
+measured against the decode pod that would otherwise serve it. Four identical requests, with
+the threshold at 1, produced exactly this:
+
+| Request | Cached credit | Prompt | Suffix | Decision |
+|---|---|---|---|---|
+| 1 | 0 | 109 | 109 | **split** — prefill served it |
+| 2–4 | 128 | 109 | **−19** | decode only |
+
+The suffix goes negative because 109 tokens occupy two 64-token blocks, so the router credits
+128 tokens of cache against a 109-token prompt. **Splitting once on a cold prompt and never
+again for that prompt is optimal**, not a bug — there is no prefill work left to move, and the
+transfer would be pure cost.
+
+It also means a benchmark that sends the same prompt repeatedly makes a working P/D setup look
+broken. That is exactly what happened here first.
+
+---
+
+## "Enabled" is not "operating"
+
+For a day, the EPP's startup log said disaggregation was on. Both profiles loaded. The
+decider was configured. And **no request was ever split.**
+
+The cluster disagreed with the log, in one place only. After three identical requests:
+
+| Pod | `prefix_cache_hits_total` | `prefix_cache_queries_total` |
+|---|---|---|
+| `sim-decode` | 128 | 306 |
+| `sim-prefill` | **metric absent** | **metric absent** |
+
+A Prometheus counter that has never incremented is not exported at all — so **"absent" meant
+zero requests, not zero hits.** Every request had gone to decode, which prefilled locally.
+
+### Why
+
+The EPP does not send anything to the prefill pod. It *names* that pod in an
+`x-prefiller-host-port` header and expects something else to act on it — a reverse proxy
+sidecar running in front of the decode model server, which reads the header, drives the prefill
+worker, arranges the KV transfer, and only then hands the request to the local server.
+
+There was no such sidecar. The header reached a model server that had no idea what it meant,
+and was ignored. **A missing component, not a misconfiguration** — and both observations were
+true at once: the scheduler *was* disaggregating, and the cluster *was not*.
+
+<Aside type="caution" title="The lesson, which is the same one as the hypervisor">
+Every layer reported success. The Helm release was deployed, the EPP logged both profiles, the
+pods were `Ready`, and requests returned valid completions with correct token counts.
+
+Confirming a control plane is not confirming a data path. A feature that is configured, loaded
+and logged can still be doing nothing — and the way to tell the difference is always the same:
+**find a number that only moves if the work actually happened, and look at it.**
+</Aside>
+
+---
+
+## Inspecting it on a live cluster
+
+The EPP image is **distroless** — no shell, no `cat`, no `curl`, so `kubectl exec` fails.
+Read its configuration from the ConfigMap instead, and its metrics through the Service:
+
+```bash
+kubectl -n llm-d get configmap sim-pool-epp -o yaml
+kubectl -n llm-d logs deploy/sim-pool-epp --tail=40
+kubectl -n llm-d get pods -o wide -L llm-d.ai/role
+```
+
+The full configuration, including the scheduling profiles as YAML, is in the repository:
+**[github.com/igfurlan/k3s-llmd-lab](https://github.com/igfurlan/k3s-llmd-lab)**

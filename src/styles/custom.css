@@ -1,32 +1,145 @@
-/* Custom styles for Kubernetes Homelab Portfolio */
+/* ---------------------------------------------------------------------------
+   Igor Furlan — portfolio styling on top of Starlight.
+   Refinement, not replacement: Starlight keeps its layout, search and nav.
+   What changes is typography, the accent ramp, and the few components the
+   content actually uses.
+   --------------------------------------------------------------------------- */
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --sl-color-accent-low: #1a2744;
-  --sl-color-accent: #3b82f6;
-  --sl-color-accent-high: #93c5fd;
+  /* Teal rather than the default blue.
+     The Kubernetes mark in the hero is #326CE5; an accent in the same blue
+     family would compete with it, so the interface sits a step away in hue
+     while staying in the same cool register. The lab diagrams use the same
+     teal, so the site and the images shared from it read as one thing. */
+  --sl-color-accent-low: #0d2f36;
+  --sl-color-accent: #14808f;
+  --sl-color-accent-high: #8fdbe6;
+
+  --sl-font: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  /* Slightly narrower measure. Starlight's default line length is generous for
+     prose this dense. */
+  --sl-content-width: 50rem;
 }
 
-/* Badge styling for tech stack */
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d7f0f4;
+  --sl-color-accent: #0b6e7d;
+  --sl-color-accent-high: #05323a;
+}
+
+/* Headings carry the personality; body text stays neutral and readable. */
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4,
+h1, h2, h3 {
+  font-family: 'Archivo', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* The site title in the header reads as a name, so give it the display face. */
+.site-title, a.site-title span {
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* --- tech badges ------------------------------------------------------------
+   These are links now, not labels: each one goes to the page where that
+   technology is actually used, which turns a keyword list into navigation. */
 .tech-badge {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
-  margin: 0.2rem;
+  padding: 0.28rem 0.7rem;
+  margin: 0.18rem 0.1rem;
   border-radius: 9999px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
+  font-family: var(--sl-font-mono);
+  line-height: 1.45;
   background: var(--sl-color-accent-low);
   color: var(--sl-color-accent-high);
-  border: 1px solid var(--sl-color-accent);
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+a.tech-badge:hover,
+a.tech-badge:focus-visible {
+  border-color: var(--sl-color-accent);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tech-badge { transition: none; }
+  a.tech-badge:hover { transform: none; }
 }
 
-/* Architecture diagram */
+/* --- cards ------------------------------------------------------------------
+   Starlight's cards are fine; these just sit a little more deliberately —
+   a hairline that responds to the accent, and tighter internal rhythm. */
+.card {
+  border-color: var(--sl-color-hairline);
+  transition: border-color 0.15s ease;
+}
+.card:hover { border-color: var(--sl-color-accent); }
+.card .title { font-family: 'Archivo', system-ui, sans-serif; letter-spacing: -0.015em; }
+
+/* --- tables -----------------------------------------------------------------
+   Most pages here compare measurements, so tables carry real weight. Numbers
+   line up; headers stop shouting. */
+.sl-markdown-content table {
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+.sl-markdown-content th {
+  font-family: var(--sl-font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+}
+.sl-markdown-content td code { white-space: nowrap; }
+
+/* --- hero -------------------------------------------------------------------
+   The splash hero's tagline is doing a job here, so give it room. */
+.hero > img, .hero > picture > img { filter: drop-shadow(0 12px 32px rgb(0 0 0 / 0.35)); }
+.hero .tagline { font-size: clamp(1rem, 2.2vw, 1.2rem); max-width: 46ch; }
+
+/* --- embedded diagrams ------------------------------------------------------ */
+.sl-markdown-content iframe {
+  display: block;
+  margin-block: 1.5rem;
+  color-scheme: light dark;
+}
+
+/* Architecture diagram blocks (pre-formatted ASCII) */
 .arch-diagram {
   background: var(--sl-color-bg-sidebar);
   border: 1px solid var(--sl-color-hairline);
   border-radius: 8px;
   padding: 1.5rem;
-  font-family: monospace;
+  font-family: var(--sl-font-mono);
   font-size: 0.85rem;
   overflow-x: auto;
   white-space: pre;
+}
+
+/* The embedded interactive diagram on the AI lab architecture page.
+   Height is set here rather than inline: MDX parses element attributes as JSX,
+   and a string `style` is the kind of thing that builds fine locally and fails
+   in CI. */
+.diagram-frame {
+  width: 100%;
+  height: 1180px;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 8px;
+  background: var(--sl-color-bg);
+}
+@media (max-width: 720px) {
+  .diagram-frame { height: 1320px; }
 }

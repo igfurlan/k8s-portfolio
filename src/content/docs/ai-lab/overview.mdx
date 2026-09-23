@@ -1,0 +1,120 @@
+---
+title: AI Inference Lab
+description: Three VMs running llm-d — Gateway API with the Inference Extension, KV-cache-aware routing and prefill/decode disaggregation — built to measure whether smart routing actually beats round-robin.
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+Serving a large language model is not like serving a web request. Two requests that share a
+prompt prefix should ideally land on the **same** machine, because that machine already holds
+the intermediate state for that prefix and can skip recomputing it. A round-robin load
+balancer knows none of this — it cannot read the request body, and it knows nothing about
+what any backend holds in memory.
+
+[llm-d](https://llm-d.ai) is the project that fixes that: an inference gateway built on
+Kubernetes Gateway API, with a scheduler that reads each request and picks a backend based on
+cache state and queue depth.
+
+This lab exists to answer one question: **does that actually help, and by how much?**
+
+<Aside type="caution" title="What is real here, and what is not">
+The model servers are `llm-d-inference-sim` — the llm-d project's own GPU-free simulator. It
+emits **vLLM's own metric names**, so the gateway, the scheduler, the cache accounting and
+every dashboard behave exactly as they would against real vLLM. The tensor math is absent.
+
+So this lab can prove **where the scheduler sends requests, how often caches hit, and what
+scheduling costs**. It cannot say what a cache hit is worth in wall-clock seconds — that needs
+real weights on real accelerators. A real model does run alongside, through
+[ollama](https://ollama.com), on the same gateway.
+</Aside>
+
+---
+
+## What it found
+
+### Cache-aware routing works — under conditions
+
+Same traffic, same six model servers, caches cleared between runs:
+
+| | Prefix-aware routing | Round-robin |
+|---|---|---|
+| Prompt text reused from cache | **82.6%** | 78.4% |
+| Share of the theoretical maximum | **95.6%** | 90.7% |
+| Client latency, p50 | 13.4 ms | **5.4 ms** |
+
+The ceiling is 86.4%, set by the cache's 64-token block size — a 370-token prompt holds five
+complete blocks and a remainder nobody can cache. Against that ceiling, round-robin
+recomputes about **a quarter more** prompt tokens.
+
+The latency column is the honest half: smart routing was **2.5× slower per request here**,
+because it spends a scheduling round trip to save prefill work that a simulator performs
+almost instantly. On real accelerators that arithmetic inverts — recomputing 64 prompt tokens
+on a GPU costs far more than 8 ms of routing.
+
+### The first version of that experiment found nothing
+
+Both arms scored 74%, which turned out to be exactly `192 / 259` — the shared system prompt
+and nothing else. Three conditions were missing, and each one is a lesson about benchmarking:
+
+1. **Prompts below the block size.** Each user's own context was 40 tokens; caching works in
+   64-token blocks. Nothing ever filled a block, so nothing could ever be reused.
+2. **Memory too large to matter.** Each server could hold every conversation at once, so
+   nothing was ever evicted and scattering requests cost nothing.
+3. **One candidate per role.** The scheduler's own log said `num-of-candidates: 1`. It was
+   picking the only option, and I was calling that a routing strategy.
+
+[The full experiment, both runs →](/k8s-portfolio/ai-lab/experiment/)
+
+### A feature reported enabled while doing nothing
+
+Prefill/decode disaggregation loaded every plugin, logged both scheduling profiles, and never
+split a single request — because the component that *acts* on the scheduler's decision, a
+proxy sidecar in front of each decode server, was missing. Every layer reported healthy. The
+only contradicting evidence was a Prometheus counter that **did not exist** on one pod.
+
+[How routing works, and how that was found →](/k8s-portfolio/ai-lab/routing/)
+
+### Scheduling costs 0.4% of a request
+
+95 µs against a 23.8 ms time-to-first-token. That ratio, not the absolute number, is what
+justifies putting a scheduler in the request path at all.
+
+---
+
+## The shape of it
+
+<CardGrid>
+  <Card title="Architecture" icon="laptop">
+    Three Rocky Linux VMs on Hyper-V, provisioned by one Vagrantfile. k3s, agentgateway,
+    an InferencePool, and a tokenizer service shared between the router and the model servers.
+
+    [Read it →](/k8s-portfolio/ai-lab/architecture/)
+  </Card>
+  <Card title="How routing works" icon="random">
+    The endpoint picker: two scheduling profiles with opposite priorities, weighted scorers,
+    and a decider that computes whether a request is worth splitting across two machines.
+
+    [Read it →](/k8s-portfolio/ai-lab/routing/)
+  </Card>
+  <Card title="The experiment" icon="bars">
+    An A/B between prefix-aware routing and plain round-robin, on the same pods — including
+    the run that measured nothing and why.
+
+    [Read it →](/k8s-portfolio/ai-lab/experiment/)
+  </Card>
+  <Card title="Observability" icon="approve-check">
+    Prometheus scraping both the model servers and the scheduler, and a dashboard where every
+    panel is tied to a decision rather than a metric.
+
+    [Read it →](/k8s-portfolio/ai-lab/observability/)
+  </Card>
+</CardGrid>
+
+---
+
+## Source
+
+Everything — the Vagrantfile, the manifests, the dashboard JSON, the load generator and the
+write-ups — is public:
+
+**[github.com/igfurlan/k3s-llmd-lab](https://github.com/igfurlan/k3s-llmd-lab)**

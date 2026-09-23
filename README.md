@@ -1,49 +1,41 @@
-# Starlight Starter Kit: Basics
+# igfurlan.github.io/k8s-portfolio
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+The source of my infrastructure portfolio: two labs I run on my own hardware, written up with
+the measurements that produced them.
 
-```
-npm create astro@latest -- --template starlight
-```
+**[Read it →](https://igfurlan.github.io/k8s-portfolio/)**
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+| Lab | What it is |
+|---|---|
+| **Kubernetes Homelab** | A single bare-metal node running production patterns: GitOps with ArgoCD, Prometheus-gated canary deployments, full-stack observability, encrypted secrets in git, and a four-layer backup strategy |
+| **AI Inference Lab** | Three VMs running [llm-d](https://llm-d.ai) — Gateway API with the Inference Extension, KV-cache-aware routing and prefill/decode disaggregation — built to measure whether smart routing beats round-robin. Source: [k3s-llmd-lab](https://github.com/igfurlan/k3s-llmd-lab) |
 
-## 🚀 Project Structure
+Everything published here was measured on a running cluster. Where a measurement contradicted
+what I expected, that is written up too — those are the parts worth reading.
 
-Inside of your Astro + Starlight project, you'll see the following folders and files:
+## Running it locally
 
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+Built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.build).
+
+```bash
+npm install
+npm run dev      # http://localhost:4321/k8s-portfolio
+npm run build    # production build into ./dist
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+Pushes to `main` deploy to GitHub Pages via `.github/workflows/deploy.yml`.
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+## Layout
 
-Static assets, like favicons, can be placed in the `public/` directory.
+```
+src/content/docs/
+├── index.mdx              landing page
+├── cluster/ gitops/       the Kubernetes homelab
+├── observability/ security/ backup/
+└── ai-lab/                the AI inference lab
+public/
+├── images/                screenshots from the running clusters
+└── diagrams/              the interactive llm-d request-flow diagram
+```
 
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+The Kubernetes mark in the hero is the official CNCF artwork, used unmodified.

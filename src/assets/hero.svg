@@ -1,99 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" width="480" height="480" role="img" aria-label="Terminal showing kubectl output with Kubernetes logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" width="480" height="480" role="img" aria-label="Two terminals: one node in the musashi homelab, three nodes in the k3s AI inference lab, beside the Kubernetes logo">
 
-  <!-- Terminal window frame -->
-  <rect x="14" y="14" width="312" height="252" rx="10" ry="10" fill="#0d1117" />
+  <!-- Terminal window -->
+  <rect x="6" y="26" width="352" height="300" rx="10" ry="10" fill="#0d1117"/>
+  <rect x="6" y="26" width="352" height="32" rx="10" ry="10" fill="#161b22"/>
+  <rect x="6" y="46" width="352" height="12" fill="#161b22"/>
 
-  <!-- Title bar -->
-  <rect x="14" y="14" width="312" height="34" rx="10" ry="10" fill="#161b22" />
-  <!-- Square off the bottom corners of the title bar -->
-  <rect x="14" y="36" width="312" height="12" fill="#161b22" />
+  <circle cx="26" cy="42" r="5" fill="#ff5f57"/>
+  <circle cx="43" cy="42" r="5" fill="#ffbd2e"/>
+  <circle cx="60" cy="42" r="5" fill="#28c840"/>
+  <text x="182" y="46" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10.5" fill="#64748b" text-anchor="middle">two clusters, one operator</text>
+  <line x1="6" y1="58" x2="358" y2="58" stroke="#21262d" stroke-width="1"/>
 
-  <!-- Traffic light dots -->
-  <circle cx="36" cy="31" r="5.5" fill="#ff5f57" />
-  <circle cx="54" cy="31" r="5.5" fill="#ffbd2e" />
-  <circle cx="72" cy="31" r="5.5" fill="#28c840" />
+  <!-- musashi -->
+  <text x="18" y="82" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#326CE5">$</text>
+  <text x="28" y="82" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c9d1d9"> kubectl --context musashi get nodes</text>
+  <text x="18" y="99" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#58677e">NAME          STATUS  ROLES           VERSION</text>
+  <text x="18" y="114" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#3fb950">musashi       Ready   control-plane   v1.34.3</text>
 
-  <!-- Title text -->
-  <text x="170" y="35" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="11" fill="#64748b" text-anchor="middle">musashi — kubectl</text>
+  <!-- ai lab -->
+  <text x="18" y="146" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#326CE5">$</text>
+  <text x="28" y="146" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c9d1d9"> kubectl --context ai-lab get nodes</text>
+  <text x="18" y="163" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#58677e">NAME          STATUS  ROLES           VERSION</text>
+  <text x="18" y="178" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#3fb950">k3s-server    Ready   control-plane   v1.36.4+k3s1</text>
+  <text x="18" y="193" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#3fb950">k3s-agent-1   Ready   &lt;none&gt;          v1.36.4+k3s1</text>
+  <text x="18" y="208" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#3fb950">k3s-agent-2   Ready   &lt;none&gt;          v1.36.4+k3s1</text>
 
-  <!-- Separator line under title bar -->
-  <line x1="14" y1="48" x2="326" y2="48" stroke="#21262d" stroke-width="1" />
+  <!-- inference call -->
+  <text x="18" y="240" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#326CE5">$</text>
+  <text x="28" y="240" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c9d1d9"> curl -s $GATEWAY/v1/chat/completions \</text>
+  <text x="28" y="255" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c9d1d9">    -d @prompt.json | jq .usage</text>
+  <text x="18" y="272" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#a5b4c4">{ "prompt_tokens": 109,</text>
+  <text x="18" y="286" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#a5b4c4">  "prompt_tokens_details": { "cached_tokens": 64 } }</text>
 
-  <!-- Terminal content -->
+  <text x="18" y="310" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#326CE5">$</text>
+  <rect x="29" y="300" width="6" height="12" fill="#326CE5" rx="1" opacity="0.85"/>
 
-  <!-- Prompt 1 -->
-  <text x="26" y="70" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#3b82f6">$</text>
-  <text x="36" y="70" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c9d1d9"> kubectl get pods -A</text>
-
-  <!-- Header -->
-  <text x="26" y="86" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#58677e">NAMESPACE    NAME                   READY  STATUS</text>
-
-  <!-- Rows -->
-  <text x="26" y="101" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">argocd       argocd-server-7d4f5    1/1    Running</text>
-  <text x="26" y="116" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">monitoring   prometheus-0           1/1    Running</text>
-  <text x="26" y="131" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">monitoring   grafana-6c5b9          1/1    Running</text>
-  <text x="26" y="146" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">harbor       harbor-core-5c2d       1/1    Running</text>
-  <text x="26" y="161" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">velero       velero-8f9a2           1/1    Running</text>
-  <text x="26" y="176" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">backstage    backstage-7bc4d        1/1    Running</text>
-
-  <!-- Prompt 2 -->
-  <text x="26" y="199" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#3b82f6">$</text>
-  <text x="36" y="199" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#c9d1d9"> kubectl get nodes</text>
-
-  <!-- Node header -->
-  <text x="26" y="215" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#58677e">NAME     STATUS  ROLES           VERSION</text>
-
-  <!-- Node row -->
-  <text x="26" y="230" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5" fill="#3fb950">musashi  Ready   control-plane   v1.34.3</text>
-
-  <!-- Prompt 3 + cursor -->
-  <text x="26" y="249" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="10" fill="#3b82f6">$</text>
-  <rect x="38" y="238" width="7" height="13" fill="#3b82f6" rx="1" opacity="0.85" />
-
-  <!-- ===================== K8s badge ===================== -->
-
-  <!-- Outer glow ring (decorative, subtle) -->
-  <circle cx="375" cy="345" r="112" fill="none" stroke="#326CE5" stroke-width="1" opacity="0.15" />
-  <circle cx="375" cy="345" r="106" fill="none" stroke="#326CE5" stroke-width="1" opacity="0.25" />
-
-  <!-- Badge background — sits on top of terminal corner -->
-  <circle cx="375" cy="345" r="100" fill="#0d1117" />
-  <!-- Badge border -->
-  <circle cx="375" cy="345" r="100" fill="none" stroke="#1a2744" stroke-width="2" />
-
-  <!-- K8s outer ring -->
-  <circle cx="375" cy="345" r="86" fill="none" stroke="#326CE5" stroke-width="8" />
-
-  <!-- K8s spokes (7, from r=24 to r=70, tips at r=70) -->
-  <!-- Spoke 0: 0° (north) -->
-  <line x1="375.0" y1="321.0" x2="375.0" y2="275.0" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="375.0" cy="275.0" r="5" fill="#326CE5"/>
-
-  <!-- Spoke 1: 51.43° -->
-  <line x1="393.8" y1="330.0" x2="429.8" y2="300.4" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="429.8" cy="300.4" r="5" fill="#326CE5"/>
-
-  <!-- Spoke 2: 102.86° -->
-  <line x1="398.2" y1="350.3" x2="443.2" y2="360.6" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="443.2" cy="360.6" r="5" fill="#326CE5"/>
-
-  <!-- Spoke 3: 154.29° -->
-  <line x1="385.1" y1="366.2" x2="404.3" y2="408.1" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="404.3" cy="408.1" r="5" fill="#326CE5"/>
-
-  <!-- Spoke 4: 205.71° -->
-  <line x1="364.9" y1="366.2" x2="345.7" y2="408.1" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="345.7" cy="408.1" r="5" fill="#326CE5"/>
-
-  <!-- Spoke 5: 257.14° -->
-  <line x1="351.8" y1="350.3" x2="306.8" y2="360.6" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="306.8" cy="360.6" r="5" fill="#326CE5"/>
-
-  <!-- Spoke 6: 308.57° -->
-  <line x1="356.2" y1="330.0" x2="320.2" y2="300.4" stroke="#326CE5" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="320.2" cy="300.4" r="5" fill="#326CE5"/>
-
-  <!-- K8s center hub -->
-  <circle cx="375" cy="345" r="22" fill="#326CE5" />
-
+  <!-- Official Kubernetes mark (CNCF artwork, unmodified) -->
+  <circle cx="368" cy="362" r="104" fill="#0d1117"/>
+  <circle cx="368" cy="362" r="104" fill="none" stroke="#1a2744" stroke-width="2"/>
+  <svg x="286" y="281" width="164" height="159" viewBox="-0.17 0.08 230.10 223.35">
+<defs><style>.cls-1{fill:#fff}.cls-2{fill:#326ce5}</style></defs><path d="M134.358 126.466a3.59 3.59 0 0 0-.855-.065 3.685 3.685 0 0 0-1.425.37 3.725 3.725 0 0 0-1.803 4.825l-.026.037 8.528 20.603a43.53 43.53 0 0 0 17.595-22.102l-21.976-3.714zm-34.194 2.92a3.72 3.72 0 0 0-3.568-2.894 3.656 3.656 0 0 0-.733.065l-.037-.045-21.785 3.698a43.695 43.695 0 0 0 17.54 21.946l8.442-20.4-.066-.08a3.683 3.683 0 0 0 .207-2.29zm18.245 8a3.718 3.718 0 0 0-6.557.008h-.018l-10.713 19.372a43.637 43.637 0 0 0 23.815 1.225q2.197-.5 4.292-1.2l-10.738-19.406zm33.914-45l-16.483 14.753.009.047a3.725 3.725 0 0 0 1.46 6.395l.02.089 21.35 6.15a44.278 44.278 0 0 0-6.356-27.432zM121.7 94.039a3.725 3.725 0 0 0 5.913 2.84l.065.027 18.036-12.788a43.85 43.85 0 0 0-25.287-12.19l1.253 22.105zm-19.1 2.921a3.72 3.72 0 0 0 5.904-2.85l.092-.043 1.253-22.14a44.682 44.682 0 0 0-4.501.776 43.467 43.467 0 0 0-20.937 11.409l18.154 12.869zm-9.678 16.729a3.72 3.72 0 0 0 1.462-6.396l.018-.088-16.574-14.824a43.454 43.454 0 0 0-6.168 27.51l21.245-6.13zm16.098 6.512l6.114 2.94 6.096-2.934 1.514-6.581-4.219-5.276h-6.79l-4.231 5.268z" class="cls-2"/><path d="M216.208 133.167l-17.422-75.675a13.602 13.602 0 0 0-7.293-9.073l-70.521-33.67a13.589 13.589 0 0 0-11.705 0L38.76 48.437a13.598 13.598 0 0 0-7.295 9.072l-17.394 75.673a13.315 13.315 0 0 0-.004 5.81 13.506 13.506 0 0 0 .491 1.718 13.1 13.1 0 0 0 1.343 2.726c.239.365.491.72.765 1.064l48.804 60.678c.213.264.448.505.681.75a13.423 13.423 0 0 0 2.574 2.133 13.924 13.924 0 0 0 3.857 1.677 13.298 13.298 0 0 0 3.43.473h.759l77.504-.018a12.993 12.993 0 0 0 1.41-.083 13.47 13.47 0 0 0 1.989-.378 13.872 13.872 0 0 0 1.381-.442c.353-.135.705-.27 1.045-.433a13.941 13.941 0 0 0 1.479-.822 13.303 13.303 0 0 0 3.237-2.865l1.488-1.85 47.299-58.84a13.185 13.185 0 0 0 2.108-3.785 13.67 13.67 0 0 0 .5-1.724 13.282 13.282 0 0 0-.004-5.81zm-73.147 29.432a14.516 14.516 0 0 0 .703 1.703 3.314 3.314 0 0 0-.327 2.49 39.372 39.372 0 0 0 3.742 6.7 35.06 35.06 0 0 1 2.263 3.364c.17.315.392.803.553 1.136a4.24 4.24 0 1 1-7.63 3.607c-.161-.33-.385-.77-.522-1.082a35.275 35.275 0 0 1-1.225-3.868 39.305 39.305 0 0 0-2.896-7.097 3.335 3.335 0 0 0-2.154-1.307c-.135-.233-.635-1.15-.903-1.623a54.617 54.617 0 0 1-38.948-.1l-.955 1.73a3.429 3.429 0 0 0-1.819.887 29.517 29.517 0 0 0-3.268 7.582 34.9 34.9 0 0 1-1.218 3.868c-.135.31-.361.744-.522 1.073v.009l-.007.008a4.238 4.238 0 1 1-7.619-3.616c.159-.335.372-.82.54-1.135a35.177 35.177 0 0 1 2.262-3.373 41.228 41.228 0 0 0 3.82-6.866 4.188 4.188 0 0 0-.376-2.387l.768-1.84a54.922 54.922 0 0 1-24.338-30.387l-1.839.313a4.68 4.68 0 0 0-2.428-.855 39.524 39.524 0 0 0-7.356 2.165 35.589 35.589 0 0 1-3.787 1.45c-.305.084-.745.168-1.093.244-.028.01-.052.022-.08.029a.605.605 0 0 1-.065.006 4.236 4.236 0 1 1-1.874-8.224l.061-.015.037-.01c.353-.083.805-.2 1.127-.262a35.27 35.27 0 0 1 4.05-.326 39.388 39.388 0 0 0 7.564-1.242 5.835 5.835 0 0 0 1.814-1.83l1.767-.516a54.613 54.613 0 0 1 8.613-38.073l-1.353-1.206a4.688 4.688 0 0 0-.848-2.436 39.366 39.366 0 0 0-6.277-4.41 35.25 35.25 0 0 1-3.499-2.046c-.256-.191-.596-.478-.874-.704l-.063-.044a4.473 4.473 0 0 1-1.038-6.222 4.066 4.066 0 0 1 3.363-1.488 5.03 5.03 0 0 1 2.942 1.11c.287.225.68.526.935.745a35.253 35.253 0 0 1 2.78 2.95 39.383 39.383 0 0 0 5.69 5.142 3.333 3.333 0 0 0 2.507.243q.754.55 1.522 1.082A54.289 54.289 0 0 1 102.86 61.89a55.052 55.052 0 0 1 7.63-1.173l.1-1.784a4.6 4.6 0 0 0 1.37-2.184 39.476 39.476 0 0 0-.47-7.654 35.466 35.466 0 0 1-.576-4.014c-.011-.307.006-.731.01-1.081 0-.04-.01-.08-.01-.118a4.242 4.242 0 1 1 8.441-.004c0 .37.022.86.009 1.2a35.109 35.109 0 0 1-.579 4.013 39.533 39.533 0 0 0-.478 7.656 3.344 3.344 0 0 0 1.379 2.11c.015.305.065 1.323.102 1.884a55.309 55.309 0 0 1 35.032 16.927l1.606-1.147a4.69 4.69 0 0 0 2.56-.278 39.532 39.532 0 0 0 5.69-5.148 35.004 35.004 0 0 1 2.787-2.95c.259-.222.65-.52.936-.746a4.242 4.242 0 1 1 5.258 6.598c-.283.229-.657.548-.929.75a35.095 35.095 0 0 1-3.507 2.046 39.495 39.495 0 0 0-6.277 4.41 3.337 3.337 0 0 0-.792 2.39c-.235.216-1.06.947-1.497 1.343a54.837 54.837 0 0 1 8.792 37.983l1.704.496a4.745 4.745 0 0 0 1.82 1.83 39.464 39.464 0 0 0 7.568 1.246 35.64 35.64 0 0 1 4.046.324c.355.065.868.207 1.23.29a4.236 4.236 0 1 1-1.878 8.223l-.061-.008c-.028-.007-.054-.022-.083-.03-.348-.075-.785-.151-1.09-.231a35.14 35.14 0 0 1-3.785-1.462 39.477 39.477 0 0 0-7.363-2.165 3.337 3.337 0 0 0-2.362.877q-.9-.171-1.804-.316a54.92 54.92 0 0 1-24.328 30.605z" class="cls-2"/><path d="M225.407 135.107L206.4 52.547a14.838 14.838 0 0 0-7.958-9.9l-76.935-36.73a14.825 14.825 0 0 0-12.771 0L31.808 42.669a14.838 14.838 0 0 0-7.961 9.895L4.873 135.129a14.668 14.668 0 0 0 1.995 11.185c.261.4.538.788.838 1.162l53.246 66.205a14.98 14.98 0 0 0 11.499 5.487l85.387-.02a14.986 14.986 0 0 0 11.5-5.48l53.227-66.211a14.72 14.72 0 0 0 2.842-12.347zm-9.197 3.866a13.677 13.677 0 0 1-.498 1.723 13.184 13.184 0 0 1-2.11 3.786l-47.299 58.838-1.486 1.852a13.305 13.305 0 0 1-3.24 2.865 13.945 13.945 0 0 1-1.474.822q-.513.237-1.045.43a13.873 13.873 0 0 1-1.383.445 13.473 13.473 0 0 1-1.989.379 12.988 12.988 0 0 1-1.41.082l-77.504.018h-.76a13.298 13.298 0 0 1-3.429-.472 13.925 13.925 0 0 1-3.855-1.679 13.424 13.424 0 0 1-2.576-2.132c-.233-.246-.468-.487-.68-.75l-48.805-60.679q-.408-.514-.765-1.066a13.102 13.102 0 0 1-1.343-2.726 13.505 13.505 0 0 1-.491-1.719 13.315 13.315 0 0 1 .004-5.809l17.394-75.675a13.598 13.598 0 0 1 7.295-9.07l70.508-33.685a13.589 13.589 0 0 1 11.705 0l70.519 33.67a13.602 13.602 0 0 1 7.293 9.073l17.422 75.674a13.282 13.282 0 0 1 .002 5.807z" class="cls-1"/><path d="M185.814 127.106c-.36-.083-.874-.225-1.227-.29a35.642 35.642 0 0 0-4.046-.326 39.464 39.464 0 0 1-7.57-1.242 4.745 4.745 0 0 1-1.82-1.832l-1.704-.496a54.837 54.837 0 0 0-8.79-37.983c.436-.396 1.262-1.127 1.495-1.342a3.338 3.338 0 0 1 .792-2.39 39.495 39.495 0 0 1 6.277-4.41 35.095 35.095 0 0 0 3.507-2.046c.272-.202.644-.522.929-.75a4.242 4.242 0 1 0-5.256-6.6c-.288.227-.68.525-.936.747a35.004 35.004 0 0 0-2.789 2.95 39.533 39.533 0 0 1-5.69 5.148 4.69 4.69 0 0 1-2.56.278l-1.606 1.147a55.309 55.309 0 0 0-35.032-16.927c-.039-.561-.087-1.577-.102-1.884a3.344 3.344 0 0 1-1.377-2.11 39.533 39.533 0 0 1 .478-7.656 35.112 35.112 0 0 0 .575-4.012c.013-.34-.007-.834-.007-1.201a4.242 4.242 0 1 0-8.441.004c0 .04.009.078.01.118-.004.35-.021.774-.01 1.08a35.476 35.476 0 0 0 .576 4.015 39.475 39.475 0 0 1 .47 7.654 4.601 4.601 0 0 1-1.37 2.182l-.1 1.786a55.052 55.052 0 0 0-7.63 1.173 54.289 54.289 0 0 0-27.574 15.754q-.77-.531-1.526-1.082a3.333 3.333 0 0 1-2.506-.243 39.383 39.383 0 0 1-5.69-5.141 35.255 35.255 0 0 0-2.777-2.95c-.257-.22-.65-.52-.938-.75a5.03 5.03 0 0 0-2.942-1.11 4.066 4.066 0 0 0-3.363 1.49 4.473 4.473 0 0 0 1.038 6.222l.065.046c.276.226.616.515.872.702a35.256 35.256 0 0 0 3.499 2.048 39.367 39.367 0 0 1 6.276 4.412 4.69 4.69 0 0 1 .849 2.434l1.351 1.208a54.613 54.613 0 0 0-8.611 38.073l-1.767.514a5.835 5.835 0 0 1-1.814 1.827 39.39 39.39 0 0 1-7.565 1.247 35.266 35.266 0 0 0-4.049.326c-.324.06-.774.174-1.127.262l-.037.008-.06.018a4.236 4.236 0 1 0 1.875 8.224l.063-.01c.028-.006.052-.02.08-.025.348-.08.786-.163 1.092-.246a35.59 35.59 0 0 0 3.786-1.451 39.527 39.527 0 0 1 7.358-2.165 4.68 4.68 0 0 1 2.426.857l1.84-.315a54.922 54.922 0 0 0 24.34 30.387l-.769 1.84a4.188 4.188 0 0 1 .377 2.387 41.228 41.228 0 0 1-3.82 6.864 35.183 35.183 0 0 0-2.263 3.372c-.168.318-.381.805-.542 1.138a4.238 4.238 0 1 0 7.621 3.616l.007-.008v-.01c.16-.33.387-.763.522-1.072a34.903 34.903 0 0 0 1.218-3.868 29.517 29.517 0 0 1 3.268-7.582 3.43 3.43 0 0 1 1.819-.888l.957-1.73a54.617 54.617 0 0 0 38.946.099c.268.478.768 1.392.9 1.623a3.335 3.335 0 0 1 2.155 1.31 39.306 39.306 0 0 1 2.898 7.096 35.275 35.275 0 0 0 1.225 3.868c.137.312.36.75.522 1.082a4.24 4.24 0 1 0 7.63-3.607c-.161-.333-.383-.82-.55-1.136a35.06 35.06 0 0 0-2.263-3.364 39.372 39.372 0 0 1-3.742-6.7 3.314 3.314 0 0 1 .324-2.49 14.519 14.519 0 0 1-.703-1.703 54.92 54.92 0 0 0 24.328-30.605c.546.087 1.497.253 1.806.316a3.337 3.337 0 0 1 2.36-.877 39.476 39.476 0 0 1 7.36 2.165 35.135 35.135 0 0 0 3.788 1.462c.305.08.74.156 1.09.233.029.008.055.02.083.028l.06.009a4.236 4.236 0 1 0 1.878-8.224zm-40.1-42.987l-18.037 12.787-.063-.03a3.723 3.723 0 0 1-5.913-2.838l-.02-.01-1.253-22.103a43.85 43.85 0 0 1 25.285 12.194zm-33.978 24.228h6.788l4.22 5.276-1.513 6.58-6.096 2.934-6.114-2.94-1.516-6.583zm-6.386-35.648a44.672 44.672 0 0 1 4.503-.774l-1.255 22.137-.092.044a3.72 3.72 0 0 1-5.904 2.852l-.035.02-18.154-12.872a43.467 43.467 0 0 1 20.937-11.407zm-27.52 19.68l16.574 14.824-.018.09a3.72 3.72 0 0 1-1.462 6.395l-.017.072-21.245 6.13a43.454 43.454 0 0 1 6.168-27.51zm22.191 39.38l-8.441 20.397a43.696 43.696 0 0 1-17.536-21.948l21.783-3.7.037.049a3.655 3.655 0 0 1 .73-.065 3.72 3.72 0 0 1 3.364 5.185zm24.916 26.23a43.637 43.637 0 0 1-23.815-1.223l10.713-19.372h.018a3.725 3.725 0 0 1 6.557-.006h.08l10.74 19.404q-2.091.698-4.293 1.199zm13.841-5.751l-8.528-20.605.026-.037a3.725 3.725 0 0 1 1.803-4.823 3.685 3.685 0 0 1 1.425-.37 3.59 3.59 0 0 1 .855.063l.037-.046 21.977 3.714a43.53 43.53 0 0 1-17.595 22.105zm19.903-32.42l-21.352-6.15-.02-.09a3.725 3.725 0 0 1-1.46-6.395l-.008-.043 16.482-14.751a44.279 44.279 0 0 1 6.357 27.43z" class="cls-1"/>
+  </svg>
 </svg>

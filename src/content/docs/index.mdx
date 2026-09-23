@@ -1,120 +1,157 @@
 ---
-title: Kubernetes Homelab
-description: A production-grade Kubernetes homelab on bare metal — GitOps, canary deployments, full-stack observability, and secure secret management.
+title: Platform Engineering, Measured
+description: Two labs built on my own hardware — a production-pattern Kubernetes homelab, and a distributed AI inference cluster running llm-d. Every claim here was measured on the cluster.
 template: splash
 hero:
-  tagline: A production-grade Kubernetes homelab running on bare metal — GitOps, canary deployments, observability, and cloud-native security patterns.
+  tagline: I build infrastructure to find out how it actually behaves — then write down what the measurements said, including when they disagreed with me.
   image:
     file: ../../assets/hero.svg
-    alt: Terminal showing kubectl output alongside the Kubernetes logo
+    alt: Two terminals — one node in the musashi homelab, three nodes in the k3s AI inference lab — beside the Kubernetes logo
   actions:
-    - text: Cluster Architecture
+    - text: The Kubernetes Homelab
       link: /k8s-portfolio/cluster/architecture/
       icon: right-arrow
-    - text: GitOps Pipeline
-      link: /k8s-portfolio/gitops/overview/
+    - text: The AI Inference Lab
+      link: /k8s-portfolio/ai-lab/overview/
       icon: right-arrow
       variant: minimal
 ---
 
-import { Card, CardGrid, Badge } from '@astrojs/starlight/components';
+import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## About This Homelab
+Hi — I'm Igor Furlan, a Site Reliability Engineer working on platform engineering and
+cloud-native infrastructure.
 
-Hi, I'm Igor Furlan, a System Reliability Engineer passionate about platform engineering and cloud-native infrastructure.
+This site documents two labs I run on my own hardware. They exist for different reasons: one
+is a long-running production-pattern cluster I operate and keep alive, the other is a
+short, focused investigation into how distributed LLM serving actually routes traffic.
 
-This site documents a production-grade Kubernetes homelab running on a single bare-metal node — **musashi**, an AMD Ryzen 7 machine running Fedora 43 with 16 GB DDR5 RAM and a 1 TB SSD. The entire stack is built around real-world DevOps patterns: GitOps with ArgoCD, progressive delivery with Argo Rollouts, full-stack observability with Prometheus/Grafana/Loki, and encrypted secret management with Sealed Secrets.
-
-Everything here is the result of hands-on, iterative work. The goal: build infrastructure that teaches production patterns, not shortcuts.
+What they share is the approach. **Nothing here is repeated from documentation.** Every
+figure was measured on a running cluster, and the measurements that contradicted what I
+expected are written up alongside the ones that didn't — because those are the ones that
+taught me something.
 
 ---
 
-## What's Running
+## The two labs
 
-<CardGrid stagger>
-  <Card title="🖥️ Cluster Architecture" icon="laptop">
-    Single-node kubeadm cluster (Kubernetes v1.34.3) on Fedora 43. Cilium CNI with eBPF dataplane, Traefik with Gateway API, cert-manager with Let's Encrypt DNS-01, and local-path storage.
+<CardGrid>
+  <Card title="Kubernetes Homelab" icon="laptop">
+    A single bare-metal node — **musashi** — running a production-pattern cluster: GitOps with
+    ArgoCD, Prometheus-gated canary deployments, full-stack observability, encrypted secrets in
+    git, and a four-layer backup strategy with off-site storage.
 
-    [Read the Architecture →](/k8s-portfolio/cluster/architecture/)
+    Built to practise the patterns a real platform needs, in a place where breaking things
+    costs nothing.
+
+    [Start with the architecture →](/k8s-portfolio/cluster/architecture/)
   </Card>
-  <Card title="🔄 GitOps Pipeline" icon="github">
-    Two-repository GitOps pattern: GitHub Actions CI builds and pushes to GHCR, then ArgoCD syncs Kustomize overlays to the cluster. Argo Rollouts implements Prometheus-gated canary deployments with automatic rollback.
 
-    [Read the GitOps Overview →](/k8s-portfolio/gitops/overview/)
-  </Card>
-  <Card title="📊 Observability Stack" icon="bars">
-    kube-prometheus-stack v81.6.4 (Prometheus + Grafana + AlertManager), Loki for log aggregation, Grafana Alloy as a DaemonSet log collector, Pushgateway for batch job metrics, and Blackbox Exporter for synthetic HTTP probes. Alerts route to Telegram and Gmail.
+  <Card title="AI Inference Lab" icon="rocket">
+    Three virtual machines running **llm-d** — Gateway API with the Inference Extension, an
+    endpoint picker that routes on KV-cache state, and prefill/decode disaggregation.
 
-    [Read the Observability Stack →](/k8s-portfolio/observability/stack/)
-  </Card>
-  <Card title="🔒 Cluster Security" icon="shield">
-    Sealed Secrets for GitOps-compatible encrypted secrets, Harbor with Trivy for private image registry and vulnerability scanning, cert-manager for automated TLS, and Cilium eBPF for network policy enforcement.
+    Built to answer one question: does cache-aware routing actually beat round-robin? The
+    first answer was *no*, and finding out why was the interesting part.
 
-    [Read the Security Overview →](/k8s-portfolio/security/overview/)
-  </Card>
-  <Card title="💾 Backup & Recovery" icon="open-book">
-    Four-layer backup strategy: Velero + Kopia for Kubernetes resources and PV data, restic for raw PVC data and host configuration, pg_dumpall for PostgreSQL logical backups — all stored in OCI Object Storage. A custom Grafana dashboard monitors every backup run in real time.
-
-    [Read the Backup Strategy →](/k8s-portfolio/backup/strategy/)
+    [Start with the findings →](/k8s-portfolio/ai-lab/overview/)
   </Card>
 </CardGrid>
 
 ---
 
-## Tech Stack
+## Three things worth reading
+
+<CardGrid stagger>
+  <Card title="A benchmark that found nothing" icon="approve-check">
+    Prefix-aware routing tied with round-robin — 74.7% against 74.2%. That turned out to be
+    exactly `192/259`: the shared prompt and nothing else. My test prompts were below the
+    cache's block size, my memory was too large to ever evict, and the scheduler had one
+    candidate to choose from.
+
+    [How the experiment was fixed →](/k8s-portfolio/ai-lab/experiment/)
+  </Card>
+
+  <Card title="A feature that was on and doing nothing" icon="warning">
+    Prefill/decode disaggregation reported enabled for a day while never splitting a single
+    request. Every plugin loaded and every log line was green; the only contradicting evidence
+    was a Prometheus counter that did not exist on one pod.
+
+    [What was missing →](/k8s-portfolio/ai-lab/routing/)
+  </Card>
+
+  <Card title="Canary deployments that roll themselves back" icon="rocket">
+    Argo Rollouts promoting or aborting a release based on a live Prometheus query — success
+    rate and latency measured against the canary, not against a stopwatch.
+
+    [How the pipeline works →](/k8s-portfolio/gitops/overview/)
+  </Card>
+</CardGrid>
+
+---
+
+## What I work with
+
+Each badge links to where it is actually used, rather than sitting in a list.
 
 <br />
 
-**Kubernetes & Runtime**
+**Kubernetes & platform**
 
-<span class="tech-badge">Kubernetes v1.34.3</span>
-<span class="tech-badge">Kubeadm</span>
-<span class="tech-badge">Containerd v2.1.6</span>
-<span class="tech-badge">Fedora Linux 43</span>
+<a class="tech-badge" href="/k8s-portfolio/cluster/architecture/">Kubernetes</a>
+<a class="tech-badge" href="/k8s-portfolio/cluster/architecture/">kubeadm</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/architecture/">k3s</a>
+<a class="tech-badge" href="/k8s-portfolio/cluster/architecture/">Cilium (eBPF)</a>
+<a class="tech-badge" href="/k8s-portfolio/cluster/architecture/">Traefik</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/architecture/">Gateway API</a>
+<a class="tech-badge" href="/k8s-portfolio/cluster/architecture/">cert-manager</a>
 
-**Networking & Ingress**
+**AI infrastructure**
 
-<span class="tech-badge">Cilium (eBPF)</span>
-<span class="tech-badge">Traefik</span>
-<span class="tech-badge">Gateway API</span>
-<span class="tech-badge">Cloudflare Tunnel</span>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/overview/">llm-d</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/routing/">Inference Extension</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/routing/">KV-cache routing</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/routing/">Prefill/decode split</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/architecture/">agentgateway</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/architecture/">vLLM</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/architecture/">ollama</a>
 
-**GitOps & CI/CD**
+**GitOps & delivery**
 
-<span class="tech-badge">ArgoCD</span>
-<span class="tech-badge">Argo Rollouts</span>
-<span class="tech-badge">GitHub Actions</span>
-<span class="tech-badge">Kustomize</span>
-<span class="tech-badge">GHCR</span>
+<a class="tech-badge" href="/k8s-portfolio/gitops/overview/">ArgoCD</a>
+<a class="tech-badge" href="/k8s-portfolio/gitops/overview/">Argo Rollouts</a>
+<a class="tech-badge" href="/k8s-portfolio/gitops/overview/">GitHub Actions</a>
+<a class="tech-badge" href="/k8s-portfolio/gitops/overview/">Kustomize</a>
+<a class="tech-badge" href="/k8s-portfolio/gitops/overview/">Helm</a>
 
 **Observability**
 
-<span class="tech-badge">Prometheus</span>
-<span class="tech-badge">Grafana</span>
-<span class="tech-badge">Loki</span>
-<span class="tech-badge">Grafana Alloy</span>
-<span class="tech-badge">AlertManager</span>
+<a class="tech-badge" href="/k8s-portfolio/observability/stack/">Prometheus</a>
+<a class="tech-badge" href="/k8s-portfolio/observability/stack/">Grafana</a>
+<a class="tech-badge" href="/k8s-portfolio/observability/stack/">Loki</a>
+<a class="tech-badge" href="/k8s-portfolio/observability/stack/">Grafana Alloy</a>
+<a class="tech-badge" href="/k8s-portfolio/observability/stack/">AlertManager</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/observability/">PodMonitor / ServiceMonitor</a>
 
-**Security & Secrets**
+**Security & secrets**
 
-<span class="tech-badge">Sealed Secrets</span>
-<span class="tech-badge">Harbor</span>
-<span class="tech-badge">Trivy</span>
-<span class="tech-badge">Cert-manager</span>
-<span class="tech-badge">Let's Encrypt</span>
+<a class="tech-badge" href="/k8s-portfolio/security/overview/">Sealed Secrets</a>
+<a class="tech-badge" href="/k8s-portfolio/security/overview/">Trivy</a>
+<a class="tech-badge" href="/k8s-portfolio/security/overview/">etcd encryption</a>
+<a class="tech-badge" href="/k8s-portfolio/security/overview/">RBAC</a>
+<a class="tech-badge" href="/k8s-portfolio/security/overview/">Let's Encrypt</a>
 
-**Data & Backup**
+**Data & resilience**
 
-<span class="tech-badge">CloudNativePG</span>
-<span class="tech-badge">PostgreSQL</span>
-<span class="tech-badge">Velero</span>
-<span class="tech-badge">Kopia</span>
-<span class="tech-badge">Restic</span>
-<span class="tech-badge">OCI Object Storage</span>
+<a class="tech-badge" href="/k8s-portfolio/backup/strategy/">Velero</a>
+<a class="tech-badge" href="/k8s-portfolio/backup/strategy/">Kopia</a>
+<a class="tech-badge" href="/k8s-portfolio/backup/strategy/">restic</a>
+<a class="tech-badge" href="/k8s-portfolio/backup/strategy/">CloudNativePG</a>
+<a class="tech-badge" href="/k8s-portfolio/backup/strategy/">OCI Object Storage</a>
 
-**Applications**
+**Infrastructure as code**
 
-<span class="tech-badge">Backstage</span>
-<span class="tech-badge">N8N</span>
-<span class="tech-badge">Miniflux</span>
-<span class="tech-badge">Harbor Registry</span>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/architecture/">Vagrant</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/architecture/">Hyper-V</a>
+<a class="tech-badge" href="/k8s-portfolio/cluster/architecture/">Fedora / RHEL family</a>
+<a class="tech-badge" href="/k8s-portfolio/ai-lab/architecture/">Rocky Linux</a>

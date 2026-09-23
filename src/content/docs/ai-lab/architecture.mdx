@@ -1,0 +1,147 @@
+---
+title: AI Lab Architecture
+description: Three Rocky Linux VMs on Hyper-V, provisioned from one Vagrantfile — k3s, agentgateway, an InferencePool with prefill and decode pools, a shared tokenizer, and a real model alongside the simulated ones.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## How a request moves
+
+The diagram below is interactive — step through a request and watch which components take
+part. The second mode shows the same request a moment later, when the prompt is already
+cached and the scheduler decides *not* to split it.
+
+<iframe
+  class="diagram-frame"
+  src="/k8s-portfolio/diagrams/llm-d-flow.html"
+  title="Interactive diagram: how a request flows through llm-d"
+  loading="lazy"
+></iframe>
+
+[Open the diagram on its own →](/k8s-portfolio/diagrams/llm-d-flow.html)
+
+---
+
+## The cluster
+
+| Node | Runs | Cluster IP | vCPU | RAM |
+|---|---|---|---|---|
+| `k3s-server` | control plane, tokenizer, Prometheus, Grafana | `192.168.58.11` | 4 | 6 GB |
+| `k3s-agent-1` | prefill × 3 | `192.168.58.12` | 4 | 6 GB |
+| `k3s-agent-2` | decode × 3, ollama | `192.168.58.13` | 4 | 6 GB |
+
+Rocky Linux 9, k3s `v1.36.4+k3s1` with Flannel, traefik disabled because llm-d brings its own
+gateway. Swap off, firewalld off, **SELinux left enforcing** — k3s installs `k3s-selinux`
+itself, which is the posture a real RHEL deployment would have.
+
+The whole cluster comes from a single `Vagrantfile`: three VMs, two networks each, k3s
+installed and joined, in two commands.
+
+## Components
+
+| Layer | Choice | Why |
+|---|---|---|
+| Gateway API | `v1.6.2` | The routing standard the Inference Extension builds on |
+| Inference Extension | `v1.6.2` | `InferencePool` — the CRDs that let a gateway reason about LLM traffic |
+| Gateway implementation | **agentgateway `v1.5.0`** | kgateway is deprecated; Istio is heavy for 6 GB nodes |
+| llm-d router | `v0.10.0` | The endpoint picker and the prefill/decode routing sidecar |
+| Model servers | `llm-d-inference-sim v0.11.2` | GPU-free, emits vLLM's metric names |
+| Tokenizer | `vllm/vllm-openai-cpu v0.21.0` | `vllm launch render` — tokenizer only, no weights, no GPU |
+| Real model | `ollama 0.34.3`, `qwen2.5:0.5b` | Real inference on the same gateway, at `/ollama` |
+
+<Aside type="danger" title="A version pin that is not arbitrary">
+agentgateway **v1.1.0 does not work** against Gateway API 1.6.2. It watches a
+`v1alpha2.TCPRoute` that 1.6.2 no longer serves, so its informer blocks forever and its
+GatewayClass is never registered. The symptom is a controller stuck at `0/1` with nothing
+useful in the log. v1.5.0 fixes it.
+
+The same class of trap applies to install *order*: the Inference Extension CRDs must exist
+**before** agentgateway starts, or its informer waits on a resource that is not there yet.
+</Aside>
+
+---
+
+## Why a tokenizer service exists
+
+Prefix caching works by hashing fixed-size blocks of token IDs. The model servers hash the
+blocks they hold; the router hashes the incoming prompt and looks for matches. **If the two
+sides tokenize differently, no hash ever matches** — and cache-aware routing silently
+degrades to guessing while reporting no error at all.
+
+The simulator says so itself, on every start, when the service is missing:
+
+```
+Model name looks like a HuggingFace repo id but --render-url is not set;
+falling back to the simulated tokenizer. Token ids will be pseudo-hashes and
+will not match a real vLLM tokenizer, breaking KV-cache block hashing and
+prefix-cache routing.
+```
+
+So a single `render` deployment — vLLM running in tokenizer-only mode, no weights, ~90
+seconds to ready on a CPU node — serves both the router and the model servers. The model name
+must match in three places or the render call is rejected outright.
+
+The model is `Qwen2.5-1.5B-Instruct` rather than a Llama, for a practical reason: Llama is
+gated on HuggingFace and fetching its tokenizer needs an access token. Keeping the lab
+credential-free was worth more than the model name.
+
+---
+
+## Two networks per node, and why
+
+Vagrant's Hyper-V provider manages exactly **one** network adapter. This cluster needs two:
+
+| Adapter | Switch | Role |
+|---|---|---|
+| `eth0` | Hyper-V **Default Switch** | DHCP, internet, and the address Vagrant SSHes to. Windows re-randomises this subnet on every host reboot |
+| `eth1` | **`k3s-lab`**, an Internal switch | Static `192.168.58.x` — the only address k3s is ever told about |
+
+A node's IP address is its **identity**, not just a way to reach it: kubelet registration,
+Flannel's tunnel endpoints, the API server's TLS certificate SANs and the agents' join URL all
+key on it. Point k3s at a DHCP lease and the cluster works perfectly — until the next host
+reboot, when it fails as a certificate error, a join failure and broken pod networking
+simultaneously, none of which says *your IP changed*.
+
+So the second adapter is attached host-side by a PowerShell script from an `after :up`
+trigger. Three details make it work, each read from the provider's source rather than assumed:
+
+- **`bridge:` selects a switch by name**, but is applied to *every* adapter on each `vagrant up`
+  — so it is set only until Vagrant's `action_configure` sentinel exists, or it would drag the
+  cluster NIC onto the Default Switch.
+- **SSH follows adapter 0**, so the DHCP adapter has to stay first and the cluster NIC is
+  appended after it.
+- **An Internal switch has no DHCP**, so the address is assigned by a provisioner with
+  `ipv4.never-default yes`, keeping the default route out on `eth0`.
+
+These boxes are Hyper-V **generation 1** and cannot hot-add a network adapter, so the first
+run shuts each VM down, attaches, and starts it again — which is why provisioning waits for a
+second command.
+
+---
+
+## The hypervisor cost two days
+
+The lab started on VirtualBox. Every Kubernetes symptom pointed somewhere plausible:
+containerd RPCs timing out, PLEG going stale, nodes flapping `NotReady`, metrics-server
+burning 90% of a CPU while failing its own scrapes. None of them were the cause.
+
+Windows keeps a hypervisor resident for Memory Integrity, so **VirtualBox never gets AMD-V on
+this host** and falls back to NEM — where guest vCPUs are descheduled for seconds at a time.
+
+The test that settled it is deliberately dumb: sleep 50 ms, 25 times, and see how long it
+actually takes.
+
+| | VirtualBox (NEM) | Hyper-V |
+|---|---|---|
+| `sleep 0.05` × 25 | multi-second stalls | `51 51 51 … 50 51` |
+| `dmesg \| grep -c hrtimer` | 14 server / 6 per agent | **0** |
+| Load average at rest | 13–19, at 73% idle CPU | **0.03** |
+
+**Load average 13–19 while the CPU is 73% idle is the tell.** That is not a busy machine; it
+is a queue of processes that are runnable and not being run. That number alone should have
+redirected the investigation a day earlier than it did.
+
+One more assumption fell with it. The lab was designed around "the guests have no AVX-512, so
+real vLLM is impossible" — measured under VirtualBox. Under Hyper-V the same host passes the
+whole set through, including `avx512_bf16` and `avx512_vnni`. The constraint belonged to the
+hypervisor, not the hardware; only 6 GB nodes keep real vLLM out now.
