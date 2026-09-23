@@ -8,6 +8,7 @@ sidebar:
 import { Badge, Card, CardGrid, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 import ObservabilityStack from '../../../components/diagrams/ObservabilityStack.astro';
 import RolloutAnalysis from '../../../components/diagrams/RolloutAnalysis.astro';
+import LogsFlow from '../../../components/diagrams/LogsFlow.astro';
 
 
 Observability is not an afterthought in this homelab — it's a first-class concern. Every workload is monitored, every log line is indexed, and every alert has a defined routing policy. The stack is designed to answer three questions: **What is the system doing right now? What happened in the past? What should I be notified about?**
@@ -100,24 +101,7 @@ Log aggregation is handled by the **Loki + Alloy** combination. Loki stores logs
 
 ### How Logs Flow
 
-```
-K8s pods (all namespaces)          Host systemd journal
-        │                                 │
-        └──────────────┬──────────────────┘
-                       │
-              Grafana Alloy (DaemonSet)
-              (runs on every node)
-              - tails container logs
-              - reads systemd journal
-              - adds labels (namespace, pod, app)
-                       │
-                       ▼
-                    Loki (monolithic mode)
-                    5-day retention / 5 GiB PVC
-                       │
-                       ▼
-              Grafana Explore (LogQL queries)
-```
+<LogsFlow />
 
 Alloy runs as a **DaemonSet** ensuring it's present on every node. The `loki-canary` DaemonSet is a companion service that continuously writes test log entries to Loki and verifies they can be read back — providing a live health check of the log ingestion pipeline.
 

@@ -1,0 +1,71 @@
+---
+/**
+ * How a log line gets from a container or the host journal into a query.
+ * Replaces the last ASCII drawing on this page.
+ */
+---
+
+<figure class="dg-wrap">
+  <svg class="dg" viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" role="img"
+       aria-label="Container logs from every namespace and the host systemd journal are both tailed by Grafana Alloy, running as a DaemonSet, which labels them and ships them to Loki. Loki keeps five days in a five gibibyte volume, and Grafana Explore queries it with LogQL.">
+    <defs>
+      <marker id="lf-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head" points="0,0 8,4 0,8"></polygon>
+      </marker>
+      <marker id="lf-b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <polygon class="dg-head-bg" points="0,0 8,4 0,8"></polygon>
+      </marker>
+    </defs>
+
+    <!-- two sources -->
+    <text class="dg-c" x="18" y="22">TWO SOURCES, ONE PIPELINE</text>
+
+    <rect class="dg-box" x="90" y="32" width="290" height="56" rx="4"></rect>
+    <text class="dg-t" x="235" y="56" text-anchor="middle">Container logs</text>
+    <text class="dg-c" x="235" y="74" text-anchor="middle">EVERY POD, EVERY NAMESPACE</text>
+
+    <rect class="dg-box" x="520" y="32" width="290" height="56" rx="4"></rect>
+    <text class="dg-t" x="665" y="56" text-anchor="middle">systemd journal</text>
+    <text class="dg-c" x="665" y="74" text-anchor="middle">THE HOST ITSELF · ADGUARD · BACKUP TIMERS</text>
+
+    <path class="dg-e" d="M235 88 L235 112 L450 112 L450 136" marker-end="url(#lf-a)"></path>
+    <path class="dg-e" d="M665 88 L665 112 L450 112" ></path>
+
+    <!-- collector -->
+    <rect class="dg-box-2" x="270" y="138" width="360" height="66" rx="4"></rect>
+    <text class="dg-t" x="450" y="162" text-anchor="middle">Grafana Alloy</text>
+    <text class="dg-c" x="450" y="180" text-anchor="middle">DAEMONSET — ONE PER NODE</text>
+    <text class="dg-c" x="450" y="194" text-anchor="middle">TAILS · READS THE JOURNAL · ADDS LABELS</text>
+
+    <text class="dg-l" x="644" y="170">namespace · pod · app · unit</text>
+
+    <path class="dg-e" d="M450 204 L450 238" marker-end="url(#lf-a)"></path>
+    <text class="dg-l" x="459" y="226">push</text>
+
+    <!-- store -->
+    <rect class="dg-box-2" x="270" y="240" width="360" height="56" rx="4"></rect>
+    <text class="dg-t" x="450" y="264" text-anchor="middle">Loki</text>
+    <text class="dg-c" x="450" y="282" text-anchor="middle">MONOLITHIC MODE · 5 DAYS · 5 GiB PVC</text>
+
+    <!-- query -->
+    <path class="dg-e" d="M270 268 L180 268" marker-end="url(#lf-a)"></path>
+    <rect class="dg-box" x="16" y="240" width="160" height="56" rx="4"></rect>
+    <text class="dg-t" x="96" y="264" text-anchor="middle">Grafana Explore</text>
+    <text class="dg-c" x="96" y="282" text-anchor="middle">LogQL</text>
+
+    <!-- canary -->
+    <path class="dg-e-bg" d="M630 268 L724 268" marker-end="url(#lf-b)"></path>
+    <rect class="dg-box" x="728" y="240" width="156" height="56" rx="4"></rect>
+    <text class="dg-t-s" x="806" y="262" text-anchor="middle">loki-canary</text>
+    <text class="dg-c" x="806" y="280" text-anchor="middle">WRITES, THEN READS BACK</text>
+
+    <text class="dg-c" x="16" y="324">THE CANARY IS THE POINT: A LOG PIPELINE THAT SILENTLY STOPPED INGESTING LOOKS EXACTLY LIKE A QUIET CLUSTER.</text>
+  </svg>
+
+  <figcaption class="dg-cap-under">
+    Labels are the whole design: Loki indexes them and nothing else, so a query is cheap when
+    it filters on <code>namespace</code>, <code>pod</code> or <code>unit</code> and expensive
+    when it greps the message body. <code>loki-canary</code> continuously writes entries and
+    reads them back, which is the only way to tell an idle pipeline from a broken one.
+  </figcaption>
+</figure>
