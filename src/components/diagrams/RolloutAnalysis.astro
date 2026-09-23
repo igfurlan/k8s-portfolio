@@ -36,7 +36,10 @@
 
     <rect class="dg-box" x="286" y="56" width="360" height="66" rx="4"></rect>
     <text class="dg-t-s" x="300" y="78">error rate</text>
-    <text class="dg-l" x="300" y="96">traefik_service_requests_total{code=~"5.."}</text>
+    <!-- Braces are HTML entities on purpose: an .astro template parses {…} as a
+         JavaScript expression, so a literal PromQL label selector has to be
+         escaped or the build fails with "code is not defined". -->
+    <text class="dg-l" x="300" y="96">traefik_service_requests_total&#123;code=~"5.."&#125;</text>
     <text class="dg-l" x="300" y="112">÷ traefik_service_requests_total</text>
     <text class="dg-t-s" x="632" y="78" text-anchor="end">≤ 0.25</text>
 
