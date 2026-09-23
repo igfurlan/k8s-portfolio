@@ -143,3 +143,100 @@ a.tech-badge:focus-visible {
 @media (max-width: 720px) {
   .diagram-frame { height: 1320px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Measurement blocks — used on the AI lab's experiment page.
+
+   The widths live here rather than in inline styles on purpose: MDX parses
+   element attributes as JSX, so a string `style` is the kind of thing that
+   works locally and fails in CI. These are three fixed, measured values, so
+   naming them as classes costs nothing and keeps the markup clean.
+   --------------------------------------------------------------------------- */
+
+.ab { display: grid; gap: 1rem; margin-block: 1.5rem; }
+.ab-row { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem; align-items: center; }
+.ab-label { font-size: 0.88rem; color: var(--sl-color-gray-2); line-height: 1.35; }
+.ab-label b { display: block; color: var(--sl-color-white); font-weight: 600; font-size: 0.95rem; }
+
+.ab-track {
+  position: relative;
+  height: 2rem;
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 3px;
+}
+.ab-fill {
+  height: 100%;
+  border-radius: 2px 0 0 2px;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 0.5rem;
+  background: var(--sl-color-accent);
+}
+.ab-fill span {
+  font-family: var(--sl-font-mono); font-size: 0.78rem; font-weight: 700;
+  color: var(--sl-color-black); font-variant-numeric: tabular-nums;
+}
+.ab-fill.control { background: var(--sl-color-gray-4); }
+.ab-fill.control span { color: var(--sl-color-white); }
+
+/* The two measured hit ratios, and the ceiling that block granularity sets. */
+.ab-fill.smart   { width: 82.6%; }
+.ab-fill.control { width: 78.4%; }
+.ab-ceiling {
+  position: absolute; top: -0.35rem; bottom: -0.35rem; left: 86.4%;
+  width: 2px; background: var(--sl-color-red);
+}
+.ab-note {
+  grid-column: 2;
+  margin: -0.4rem 0 0;
+  font-family: var(--sl-font-mono); font-size: 0.72rem;
+  letter-spacing: 0.03em; color: var(--sl-color-red);
+}
+
+/* before → after */
+.swaps { display: grid; gap: 0.6rem; margin-block: 1.4rem; }
+.swap {
+  display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center;
+  padding: 0.7rem 0.9rem;
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-hairline);
+  border-left: 3px solid var(--sl-color-accent);
+  border-radius: 4px;
+}
+.swap > span:first-child { font-weight: 600; color: var(--sl-color-white); font-size: 0.95rem; }
+.swap-n {
+  font-family: var(--sl-font-mono); font-size: 0.85rem; white-space: nowrap;
+  color: var(--sl-color-accent-high); font-variant-numeric: tabular-nums;
+}
+.swap-n s { color: var(--sl-color-gray-3); }
+
+/* the two runs, side by side */
+.runs {
+  display: grid; gap: 0.5rem; margin-block: 1.4rem;
+  padding: 0.9rem 1rem;
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-hairline); border-radius: 4px;
+}
+.run { display: grid; grid-template-columns: 9rem 1fr auto; gap: 0.8rem; align-items: baseline; }
+.run-when {
+  font-family: var(--sl-font-mono); font-size: 0.72rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--sl-color-gray-3);
+}
+.run-vals {
+  font-family: var(--sl-font-mono); font-size: 0.9rem;
+  color: var(--sl-color-gray-2); font-variant-numeric: tabular-nums;
+}
+.run-vals b { color: var(--sl-color-white); font-weight: 700; }
+.run-gap {
+  font-family: var(--sl-font-mono); font-size: 0.78rem; font-weight: 700;
+  padding: 0.15rem 0.5rem; border-radius: 3px; white-space: nowrap;
+  background: var(--sl-color-gray-5); color: var(--sl-color-gray-2);
+}
+.run-gap.win { background: var(--sl-color-accent-low); color: var(--sl-color-accent-high); }
+
+@media (max-width: 40rem) {
+  .ab-row { grid-template-columns: 1fr; gap: 0.4rem; }
+  .ab-note { grid-column: 1; }
+  .run { grid-template-columns: 1fr; gap: 0.2rem; }
+  .swap { grid-template-columns: 1fr; gap: 0.3rem; }
+}

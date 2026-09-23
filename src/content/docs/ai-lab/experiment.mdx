@@ -79,8 +79,57 @@ actually separates the arms.
 
 ## Run 2 — three fixes, and the gap appears
 
-Per-user personas 40 → **200 tokens**. Cache per server 65,536 → **1,024 tokens**. Replicas
-1 → **3 per role**.
+Each fix removes one of the three conditions the mechanism needs:
+
+<div class="swaps">
+  <div class="swap">
+    <span>Context of their own, per user</span>
+    <span class="swap-n"><s>40</s> → 200 tokens</span>
+  </div>
+  <div class="swap">
+    <span>Memory per server</span>
+    <span class="swap-n"><s>65,536</s> → 1,024 tokens</span>
+  </div>
+  <div class="swap">
+    <span>Servers to choose between</span>
+    <span class="swap-n"><s>1</s> → 3 per role</span>
+  </div>
+</div>
+
+Nothing about the software changed — only the conditions it needs in order to matter:
+
+<div class="runs">
+  <div class="run">
+    <span class="run-when">First run</span>
+    <span class="run-vals">74.7% vs 74.2%</span>
+    <span class="run-gap">+0.5 — noise</span>
+  </div>
+  <div class="run">
+    <span class="run-when">After the fixes</span>
+    <span class="run-vals"><b>82.6%</b> vs 78.4%</span>
+    <span class="run-gap win">+4.2 points</span>
+  </div>
+</div>
+
+<div class="ab">
+  <div class="ab-row">
+    <div class="ab-label"><b>Prefix-aware</b>gateway → picker → pool</div>
+    <div class="ab-track">
+      <div class="ab-fill smart"><span>82.6%</span></div>
+      <i class="ab-ceiling"></i>
+    </div>
+  </div>
+  <div class="ab-row">
+    <div class="ab-label"><b>Round-robin</b>gateway → Service</div>
+    <div class="ab-track">
+      <div class="ab-fill control"><span>78.4%</span></div>
+      <i class="ab-ceiling"></i>
+    </div>
+    <p class="ab-note">↑ 86.4% CEILING — ONLY FIVE WHOLE 64-TOKEN BLOCKS OF A 370-TOKEN PROMPT CAN EVER CACHE</p>
+  </div>
+</div>
+
+The full numbers:
 
 | | Prefix-aware | Round-robin |
 |---|---|---|
