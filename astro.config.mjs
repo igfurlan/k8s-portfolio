@@ -53,6 +53,17 @@ export default defineConfig({
 				},
 			],
 			customCss: ['./src/styles/custom.css'],
+			// Cookieless visit counting: https://igfurlan.goatcounter.com
+			head: [
+				{
+					tag: 'script',
+					attrs: {
+						'data-goatcounter': 'https://igfurlan.goatcounter.com/count',
+						async: true,
+						src: 'https://gc.zgo.at/count.js',
+					},
+				},
+			],
 		}),
 	],
 });
