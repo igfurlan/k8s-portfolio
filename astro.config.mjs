@@ -9,6 +9,11 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Igor Furlan',
+			logo: {
+				light: './src/assets/enso-light.svg',
+				dark: './src/assets/enso-dark.svg',
+				alt: 'Ensō mark',
+			},
 			description:
 				'Platform engineering, measured rather than asserted. Two labs: a production-pattern Kubernetes homelab, and a distributed AI inference cluster running llm-d.',
 			social: [
